@@ -94,25 +94,37 @@ function tick(roomCode){
     logs.push('Arena shrinks!');
     for(const id of Object.keys(r.monsters))clampBounds(r.monsters[id],r);
   }
-  // Spawn health pack every 15s (935 ticks), max 3 on field
-  if(r.tick%935===0&&r.packs.length<3)spawnPack(r);
-  // Process blasts
+  // Spawn health packs - faster with fewer alive players
+  var aliveCount=Object.keys(r.monsters).length;
+  var packRate=aliveCount<=2?300:aliveCount<=3?500:935;
+  if(r.tick%packRate===0&&r.packs.length<3)spawnPack(r);
+  // Process new blasts -> convert to active blast accelerations
   var blastFx=[];
   if(r.blasts&&r.blasts.length){
+    if(!r.activeBlasts)r.activeBlasts=[];
     for(const bl of r.blasts){
       blastFx.push({x:bl.x,y:bl.y});
+      r.activeBlasts.push({x:bl.x,y:bl.y,ticks:6});
+      logs.push('BLAST!');
+    }
+    r.blasts=[];
+  }
+  // Apply active blast accelerations over multiple ticks
+  if(r.activeBlasts&&r.activeBlasts.length){
+    for(let bi=r.activeBlasts.length-1;bi>=0;bi--){
+      const bl=r.activeBlasts[bi];
       for(const id of Object.keys(r.monsters)){
         const m=r.monsters[id];
         const dx=m.x-bl.x,dy=m.y-bl.y;
         const dist=Math.hypot(dx,dy)||1;
         if(dist<337){
-          const force=Math.max(2,(337-dist)/10);
+          const force=Math.max(0.4,(337-dist)/60)*bl.ticks/3;
           m.vx+=dx/dist*force;m.vy+=dy/dist*force;
         }
       }
-      logs.push('BLAST!');
+      bl.ticks--;
+      if(bl.ticks<=0)r.activeBlasts.splice(bi,1);
     }
-    r.blasts=[];
   }
   for(const id of Object.keys(r.monsters))if(r.monsters[id].iframes>0)r.monsters[id].iframes--;
   for(const id of Object.keys(r.monsters)){
@@ -181,7 +193,7 @@ function tick(roomCode){
       // Keep monsterData so shapes are preserved, but clear ready state
       const saved={};for(const pid of Object.keys(r.monsterData))saved[pid]=r.monsterData[pid];
       r.monsterData={};r.savedShapes=saved;
-      r.players.forEach(p=>{if(p.readyState===1)p.send(JSON.stringify({t:'restart'}))});
+      r.players.forEach(p=>{if(p.readyState===1){p.send(JSON.stringify({t:'restart'}));p.send(JSON.stringify({t:'status',ready:0,total:r.players.length}))}});
     },4000);
   }
   const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],pk:r.packs,bl:blastFx.length?blastFx:undefined,log:logs.length?logs:undefined});
