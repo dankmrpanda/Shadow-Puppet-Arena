@@ -23,7 +23,7 @@ function startArena(roomCode){
     r.monsters[pid]={
       x:r.arenaL+80+Math.random()*(ARENA_W-160),y:r.arenaT+60+Math.random()*(ARENA_H-120),
       vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,
-      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,
+      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,iframes:0,
       spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:1+Math.min(m.l*0.3,1.5),speed:0,
       color:COLORS[idx++%6]
     };
@@ -51,29 +51,21 @@ function polyOverlap(a,b){
 }
 function tick(roomCode){
   const r=rooms[roomCode];
-  if(!r||!r.monsters)return;
+  if(!r||!r.monsters||r.done)return;
   r.tick=(r.tick||0)+1;
   const logs=[];
-  // Speed boost every 8s (100 ticks at 80ms)
-  if(r.tick%100===0){
-    for(const id of Object.keys(r.monsters)){
-      r.monsters[id].baseSpeed+=0.15;
-      logs.push('Speed up!');
-    }
+  // Speed boost every 6s (75 ticks at 80ms)
+  if(r.tick%75===0){
+    for(const id of Object.keys(r.monsters))r.monsters[id].baseSpeed+=0.15;
+    logs.push('Speed up!');
   }
-  // Shrink arena if no wall touches for 20s (250 ticks)
-  let wallTouch=false;
-  for(const id of Object.keys(r.monsters)){
-    const m=r.monsters[id];
-    const margin=m.size+5;
-    if(m.x-margin<r.arenaL||m.x+margin>r.arenaR||m.y-margin<r.arenaT||m.y+margin>r.arenaB)wallTouch=true;
-  }
-  if(wallTouch)r.lastWallTouch=r.tick;
-  if(r.tick-r.lastWallTouch>250&&(r.arenaR-r.arenaL)>200){
-    r.arenaL+=4;r.arenaT+=3;r.arenaR-=4;r.arenaB-=3;
-    r.lastWallTouch=r.tick;
+  // Shrink arena every 10s (125 ticks)
+  if(r.tick%125===0&&(r.arenaR-r.arenaL)>200){
+    r.arenaL+=5;r.arenaT+=4;r.arenaR-=5;r.arenaB-=4;
     logs.push('Arena shrinks!');
   }
+  // Tick down iframes
+  for(const id of Object.keys(r.monsters))if(r.monsters[id].iframes>0)r.monsters[id].iframes--;
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
     m.size=Math.max(8,m.baseSize*(m.hp/m.maxHp));
@@ -93,17 +85,19 @@ function tick(roomCode){
     for(let j=i+1;j<ids.length;j++){
       const a=r.monsters[ids[i]],b=r.monsters[ids[j]];
       if(!a||!b)continue;
+      if(a.iframes>0||b.iframes>0)continue;
       if(!polyOverlap(a,b))continue;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy)||0.1;
       const nx=dx/dist,ny=dy/dist;
       const dmgA=Math.min(15,Math.max(1,Math.round((b.spikes-a.stability)*3)));
       const dmgB=Math.min(15,Math.max(1,Math.round((a.spikes-b.stability)*3)));
       a.hp-=dmgA;b.hp-=dmgB;
+      a.iframes=8;b.iframes=8;
       logs.push(a.name+' -'+dmgA+' / '+b.name+' -'+dmgB);
       const push=Math.max(0.5,(a.spikes-b.stability+b.spikes-a.stability)*0.3);
       a.vx-=nx*push;a.vy-=ny*push;
       b.vx+=nx*push;b.vy+=ny*push;
-      const sep=(a.size+b.size)*0.2;
+      const sep=(a.size+b.size)*0.25;
       a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
     }
   }
@@ -111,7 +105,11 @@ function tick(roomCode){
     if(r.monsters[id].hp<=0){logs.push(r.monsters[id].name+' defeated!');delete r.monsters[id]}
   }
   const alive=Object.keys(r.monsters);
-  if(alive.length===1&&!r.winner){r.winner=true;logs.push(r.monsters[alive[0]].name+' wins!')}
+  if(alive.length<=1){
+    if(alive.length===1)logs.push(r.monsters[alive[0]].name+' wins!');
+    else if(alive.length===0)logs.push('Draw!');
+    r.done=true;
+  }
   const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],log:logs.length?logs:undefined});
   r.players.forEach(p=>{if(p.readyState===1)p.send(data)});
 }
