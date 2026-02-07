@@ -1,84 +1,80 @@
-<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Monster</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:20px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:50vh}#ui{display:none;padding:10px;text-align:center}#battle{display:none;padding:20px;text-align:center}#battle canvas{max-width:100%;margin:10px;border-radius:8px;background:#1a1a24}#log{font-size:12px;max-height:80px;overflow-y:auto;text-align:left;margin-top:10px}</style></head><body><div id=lobby><h1>🦇 Shadow Puppet Monster</h1><p style=margin:10px>Draw a monster. Stats from geometry!</p><button id=create>Create Game</button><br><input id=code placeholder="Game code" maxlength=6><button id=join>Join</button><p id=msg style=margin-top:15px;color:#888>Connecting...</p></div><div id=ui style=display:none><p id=room>Room: -----</p><canvas id=c width=240 height=240></canvas><p id=drawStatus style=margin:8px>Draw your monster silhouette</p><button id=done>Done - Fight!</button></div><div id=battle><h2>⚔️ Battle!</h2><div id=cr></div><div id=log></div></div><script>
+<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Arena</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:15px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#qr{display:none;margin:10px;background:#fff;padding:8px;border-radius:8px}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:45vh}#ui{display:none;padding:10px;text-align:center}#arena{display:none;width:100%;flex:1;max-height:70vh;flex-direction:column;align-items:center}#ac{background:#1a1a24;border-radius:8px;image-rendering:pixelated}</style></head><body><div id=lobby><h1>🦇 Shadow Puppet Arena</h1><p style=margin:8px>Draw a monster. Up to 6 players!</p><button id=create>Create Game</button><br><input id=code placeholder="Room code" maxlength=6><button id=join>Join</button><div id=qr></div><p id=msg style=margin-top:15px;color:#888>Connecting...</p></div><div id=ui style=display:none><p id=room>Room: ---</p><p id=count></p><canvas id=c width=240 height=240></canvas><p id=drawStatus style=margin:8px>Draw your monster</p><button id=done>Ready!</button></div><div id=arena><h2>⚔️ Arena</h2><canvas id=ac width=400 height=300></canvas></div><script>
 (function(){
-var W=240,H=240,lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),battle=document.getElementById('battle'),c=document.getElementById('c'),msg=document.getElementById('msg'),room=document.getElementById('room'),done=document.getElementById('done'),cr=document.getElementById('cr'),log=document.getElementById('log');
-var ws,path=[],gameCode='',playerId=0,players={},me={},opp={};
+var lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),arena=document.getElementById('arena'),c=document.getElementById('c'),ac=document.getElementById('ac'),msg=document.getElementById('msg'),room=document.getElementById('room'),count=document.getElementById('count'),qr=document.getElementById('qr'),done=document.getElementById('done');
+var W=240,H=240,path=[],playerId=0,monsters={},ws;
 var WS_URL=(location.protocol==='https:'?'wss:':'ws:')+'//'+(location.host||'localhost:3000');
+var retries=0;
 function post(m){msg.textContent=m;msg.style.color='#888'}
 function postErr(m){msg.textContent=m;msg.style.color='#e66'}
-var retries=0;
 function connect(){
-try{post(retries?'Retrying...':'Connecting... (first visit may take ~30s)');
-ws=new WebSocket(WS_URL);
-ws.onopen=function(){retries=0;post('Connected! Create or join a game.')};
-ws.onclose=function(){postErr('Disconnected.'+(retries<5?' Retrying...':' Refresh page.'));if(retries<5){retries++;setTimeout(connect,3000)}};
+post(retries?'Retrying...':'Connecting...');ws=new WebSocket(WS_URL);
+ws.onopen=function(){retries=0;post('Connected!');var u=new URL(location.href),r=u.searchParams.get('room');if(r){var code=r.toUpperCase().slice(0,6);document.getElementById('code').value=code;ws.send(JSON.stringify({t:'join',code:code}))}};
+ws.onclose=function(){postErr('Disconnected.'+(retries<5?' Retrying...':' Refresh.'));if(retries<5){retries++;setTimeout(connect,3000)}};
 ws.onmessage=function(e){var d=JSON.parse(e.data);
-if(d.t==='code'){gameCode=d.code;room.textContent='Room: '+gameCode;lobby.querySelector('#code').value=gameCode;post('Share code: '+gameCode)}
-else if(d.t==='joined'){post('Player joined!')}
+if(d.t==='code'){room.textContent='Room: '+d.code;qr.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(location.origin+location.pathname+'?room='+d.code)+'" alt=QR>';qr.style.display='block';post('Share QR or code: '+d.code)}
+else if(d.t==='joined'){count.textContent=(d.count||0)+' players';post('Player joined!')}
 else if(d.t==='start'){lobby.style.display='none';ui.style.display='block';c.style.display='block';playerId=d.id}
-else if(d.t==='monster'){players[d.id]=d.m;if(Object.keys(players).length===2)fight()}
+else if(d.t==='monster'){count.textContent=(Object.keys(monsters).length+1)+' ready';monsters[d.id]=d.m}
+else if(d.t==='arena'){monsters=d.m;lobby.style.display='none';ui.style.display='none';arena.style.display='flex';renderArena()}
 else if(d.t==='full'){postErr('Room full')}
-else if(d.t==='invalid'){postErr('Invalid code')}}
-}catch(e){postErr('No server. Run server.js')}}
+else if(d.t==='invalid'){postErr('Invalid code')}}}
 function createGame(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'create'}));else postErr('Connecting...')}
-function joinGame(){if(ws&&ws.readyState!==1){postErr('Connecting...');return}var code=document.getElementById('code').value.toUpperCase();if(code.length!==6){postErr('Code is 6 chars');return}
+function joinGame(){var code=document.getElementById('code').value.toUpperCase().slice(0,6);if(!code){postErr('Enter code');return}
 ws.send(JSON.stringify({t:'join',code:code}))}
 document.getElementById('create').onclick=createGame;
 document.getElementById('join').onclick=joinGame;
 function analyze(){
 var ctx=c.getContext('2d'),id=ctx.getImageData(0,0,W,H),d=id.data;
 var area=0;for(var i=0;i<d.length;i+=4)if(d[i]>200)area++;
-var pts=path.length>50?path.filter(function(_,i){return i%2===0}):path;
+var pts=path;if(path.length>25){pts=[];for(var i=0;i<20;i++)pts.push(path[Math.floor(i*(path.length-1)/19)])}
 var corners=0;for(var i=2;i<pts.length;i++){var a=Math.atan2(pts[i].y-pts[i-1].y,pts[i].x-pts[i-1].x),b=Math.atan2(pts[i-1].y-pts[i-2].y,pts[i-1].x-pts[i-2].x);if(Math.abs(a-b)>.7)corners++}
 var cx=0,cy=0;for(var i=0;i<pts.length;i++){cx+=pts[i].x;cy+=pts[i].y}cx/=pts.length;cy/=pts.length;
 var left=0,right=0;for(var i=0;i<pts.length;i++){var v=pts[i].y-cy;if(pts[i].x<cx)left+=v*v;else right+=v*v}
 var sym=Math.min(1,1-Math.abs(left-right)/(left+right+1));
 var segs=[];for(var i=1;i<pts.length;i++)segs.push(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
 var avg=segs.reduce(function(a,b){return a+b},0)/segs.length;var legs=0;for(var i=0;i<segs.length;i++)if(segs[i]>avg*1.8)legs++;
-return{hp:Math.max(10,Math.floor(area/40)),atk:Math.max(1,corners+1),def:Math.max(1,Math.floor(sym*5)+1),spd:Math.max(1,Math.min(legs+1,5))}}
+var p=[];for(var i=0;i<Math.min(pts.length,20);i++){var j=Math.floor(i*(pts.length-1)/19);p.push([Math.round(pts[j].x/12),Math.round(pts[j].y/12)])}
+return{a:area,c:corners,s:sym,l:legs,p:p}}
 function drawMonster(){
 var ctx=c.getContext('2d'),pts=path;
 if(pts.length<3)return null;
 ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);
-ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
-for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();
+ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();
 var stats=analyze();
 ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);
-ctx.fillStyle='#2d2d3d';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
-for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();
+ctx.fillStyle='#2d2d3d';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();
 ctx.strokeStyle='#6a4c93';ctx.lineWidth=2;ctx.stroke();
 return stats}
-function fight(){
-var pids=Object.keys(players);me=players[pids[0]];opp=players[pids[1]];
-if(playerId===2){me=players[pids[1]];opp=players[pids[0]]}
-ui.style.display='none';battle.style.display='block';
-cr.innerHTML='';
-var add=function(t){log.innerHTML+='<div>'+t+'</div>';log.scrollTop=log.scrollHeight};
-add('Monster 1: HP '+me.hp+' ATK '+me.atk+' DEF '+me.def+' SPD '+me.spd);
-add('Monster 2: HP '+opp.hp+' ATK '+opp.atk+' DEF '+opp.def+' SPD '+opp.spd);
-var m1={...me,hp:me.hp},m2={...opp,hp:opp.hp};
-var turn=0;
-function step(){
-turn++;var first,second;if(m1.spd>=m2.spd){first=m1;second=m2}else{first=m2;second=m1}
-var dmg=Math.max(1,Math.floor(first.atk*(10/(10+second.def))));
-second.hp-=dmg;add('Turn '+turn+': '+first.atk+' attack! -'+dmg+' HP');
-if(second.hp<=0){add((second===m1?'Monster 2':'Monster 1')+' wins!');return}
-dmg=Math.max(1,Math.floor(second.atk*(10/(10+first.def))));
-first.hp-=dmg;add('Turn '+turn+': '+second.atk+' counter! -'+dmg+' HP');
-if(first.hp<=0){add((first===m1?'Monster 2':'Monster 1')+' wins!');return}
-setTimeout(step,800)}
-setTimeout(step,500)}
+function renderArena(){
+var ctx=ac.getContext('2d');
+ctx.fillStyle='#0d0d12';ctx.fillRect(0,0,400,300);
+ctx.strokeStyle='#333';ctx.strokeRect(2,2,396,296);
+for(var id in monsters){
+var m=monsters[id];
+if(!m.path||!m.path.length)continue;
+ctx.save();
+ctx.translate(m.x,m.y);
+ctx.scale(m.size/40,m.size/40);
+ctx.translate(-120,-120);
+ctx.fillStyle=m.color;ctx.beginPath();
+ctx.moveTo(m.path[0][0]*12,m.path[0][1]*12);
+for(var i=1;i<m.path.length;i++)ctx.lineTo(m.path[i][0]*12,m.path[i][1]*12);
+ctx.closePath();ctx.fill();
+ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke();
+ctx.restore();
+}}
+done.onclick=function(){var s=drawMonster();if(!s){document.getElementById('drawStatus').textContent='Draw closed shape first';return}
+ws.send(JSON.stringify({t:'monster',m:s}));done.textContent='Waiting...';done.disabled=true};
 function onDown(e){var r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height;var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;path=[{x:px*sx,y:py*sy}]}
 function onMove(e){if(path.length===0)return;var r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height;var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;path.push({x:px*sx,y:py*sy});var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#8a6cb8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);for(var i=1;i<path.length;i++)ctx.lineTo(path[i].x,path[i].y);ctx.stroke()}
 function onUp(){if(path.length<10)return;drawMonster()}
-done.onclick=function(){
-var stats=drawMonster();if(!stats){var ds=document.getElementById('drawStatus');if(ds)ds.textContent='Draw a closed shape first';return}
-ws.send(JSON.stringify({t:'monster',m:stats}));done.textContent='Sent! Waiting...';done.disabled=true};
 c.addEventListener('touchstart',function(e){e.preventDefault();onDown(e)});
 c.addEventListener('touchmove',function(e){e.preventDefault();onMove(e)});
 c.addEventListener('touchend',function(e){e.preventDefault();if(e.touches.length===0)onUp()});
 c.addEventListener('mousedown',onDown);
 c.addEventListener('mousemove',function(e){if(e.buttons)onMove(e)});
 c.addEventListener('mouseup',onUp);
+setInterval(function(){if(arena.style.display==='flex'&&Object.keys(monsters).length)renderArena()},50);
 connect();
 })();
 </script></body></html>
