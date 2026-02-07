@@ -69,6 +69,9 @@
 
         #ui {
             display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             padding: 10px;
             text-align: center;
             width: 100%;
@@ -291,7 +294,7 @@
         <p id=count></p><input id=mname placeholder="Name your shape" maxlength=12><br><canvas id=c width=300
             height=300></canvas>
         <p class=hint>Draw in ONE stroke. Shape will auto-close.</p>
-        <div id=statsPanel style="margin:6px;padding:8px;background:rgba(20,20,35,0.9);border-radius:8px;border:1px solid #444;font-size:11px;display:none;max-width:320px;text-align:left">
+        <div id=statsPanel style="margin:6px auto;padding:8px;background:rgba(20,20,35,0.9);border-radius:8px;border:1px solid #444;font-size:11px;display:none;max-width:320px;text-align:left">
             <div style="font-weight:bold;text-align:center;color:#ccc;margin-bottom:4px">Shape Analysis</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
                 <div>📐 <b>Area</b>: <span id=statArea>-</span></div>
@@ -347,7 +350,7 @@
                     if (d.t === 'code') { room.textContent = 'Room: ' + d.code; var joinUrl = location.origin + '/join/' + d.code; var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(joinUrl); qr.innerHTML = '<img src="' + qrUrl + '" alt=QR>'; qr.style.display = 'block'; document.getElementById('qrDraw').innerHTML = '<img src="' + qrUrl + '" alt=QR style=background:#fff;padding:4px;border-radius:6px>'; document.getElementById('qrDraw').style.display = 'block'; post('Share QR or code: ' + d.code) }
                     else if (d.t === 'joined') { count.textContent = (d.count || 0) + ' players'; post('Player joined!') }
                     else if (d.t === 'status') { count.textContent = d.ready + '/' + d.total + ' ready' }
-                    else if (d.t === 'start') { lobby.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; playerId = d.id; if (d.color) myColor = d.color }
+                    else if (d.t === 'start') { lobby.style.display = 'none'; ui.style.display = 'flex'; c.style.display = 'block'; playerId = d.id; if (d.color) myColor = d.color }
                     else if (d.t === 'arena') {
                         monsters = d.m; packs = d.pk || []; powerups = d.pu || []; hazards = d.hz || []; particles = d.pt || [];
                         if (d.b) bounds = d.b;
@@ -361,7 +364,7 @@
                         else if (monsters[playerId]) { myAbility = monsters[playerId].ability || 'none'; }
                         renderArena()
                     }
-                    else if (d.t === 'restart') { isDead = false; hasSavedShape = true; if (path.length > 3) savedPath = path.slice(); arena.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; isReady = false; done.style.display = 'inline-block'; unready.style.display = 'none'; blastBtn.disabled = false; blastBtn.style.background = ''; blastCooldown = 0; abilityCooldown = 0; abilityBtn.disabled = false; abilityBtn.style.background = ''; blastFx = []; floatTexts = []; lightningWarning = null; lightningStrike = null; particles = []; if (savedPath.length > 3) { loadPrevBtn.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Load previous shape or draw new'; } else { document.getElementById('drawStatus').textContent = 'Draw your monster'; } document.getElementById('drawStatus').style.color = '#888'; if (path.length > 3) drawMonster() }
+                    else if (d.t === 'restart') { isDead = false; hasSavedShape = true; if (path.length > 3) savedPath = path.slice(); arena.style.display = 'none'; ui.style.display = 'flex'; c.style.display = 'block'; isReady = false; done.style.display = 'inline-block'; unready.style.display = 'none'; blastBtn.disabled = false; blastBtn.style.background = ''; blastCooldown = 0; abilityCooldown = 0; abilityBtn.disabled = false; abilityBtn.style.background = ''; blastFx = []; floatTexts = []; lightningWarning = null; lightningStrike = null; particles = []; if (savedPath.length > 3) { loadPrevBtn.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Load previous shape or draw new'; } else { document.getElementById('drawStatus').textContent = 'Draw your monster'; } document.getElementById('drawStatus').style.color = '#888'; if (path.length > 3) drawMonster() }
                     else if (d.t === 'full') { postErr('Room full') }
                     else if (d.t === 'invalid') { postErr('Invalid code') }
                 }
