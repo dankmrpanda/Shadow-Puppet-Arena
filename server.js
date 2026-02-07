@@ -74,7 +74,7 @@ function startArena(roomCode) {
       vx: (dx / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       vy: (dy / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       path: m.p, name: m.n || '???', baseSize: BASE_SIZE, size: BASE_SIZE, hp: hp, maxHp: hp, iframes: 0,
-      spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2) + (ability === 'none' ? 1 : 0), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
+      spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
       color: r.colors[pid] || '#9b59b6',
       ability: ability, abilityCooldown: 0,
       effects: {}, // { speed: ticksLeft, shield: ticksLeft, etc }

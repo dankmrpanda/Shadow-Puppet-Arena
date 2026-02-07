@@ -202,7 +202,7 @@
             <div style="font-weight:bold;text-align:center;color:#ccc;margin-bottom:4px">Shape Analysis</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
                 <div>📐 <b>Area</b>: <span id=statArea>-</span></div>
-                <div style=color:#888;font-size:10px>→ HP (bigger=more HP)</div>
+                <div style=color:#888;font-size:10px>→ HP (compact shape=more)</div>
                 <div>📐 <b>Corners</b>: <span id=statCorners>-</span></div>
                 <div style=color:#888;font-size:10px>→ Spikes/Dmg dealt</div>
                 <div>⚖ <b>Symmetry</b>: <span id=statSym>-</span></div>
@@ -265,7 +265,7 @@
                         else if (monsters[playerId]) { myAbility = monsters[playerId].ability || 'none'; }
                         renderArena()
                     }
-                    else if (d.t === 'restart') { isDead = false; hasSavedShape = true; if (path.length > 3) savedPath = path.slice(); arena.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; isReady = false; done.style.display = 'inline-block'; unready.style.display = 'none'; blastBtn.disabled = false; blastBtn.style.background = ''; blastCooldown = 0; abilityCooldown = 0; abilityBtn.disabled = false; abilityBtn.style.background = ''; blastFx = []; if (savedPath.length > 3) { loadPrevBtn.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Load previous shape or draw new'; } else { document.getElementById('drawStatus').textContent = 'Draw your monster'; } document.getElementById('drawStatus').style.color = '#888'; if (path.length > 3) drawMonster() }
+                    else if (d.t === 'restart') { isDead = false; hasSavedShape = true; if (path.length > 3) savedPath = path.slice(); arena.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; isReady = false; done.style.display = 'inline-block'; unready.style.display = 'none'; blastBtn.disabled = false; blastBtn.style.background = ''; blastCooldown = 0; abilityCooldown = 0; abilityBtn.disabled = false; abilityBtn.style.background = ''; blastFx = []; floatTexts = []; lightningWarning = null; lightningStrike = null; particles = []; if (savedPath.length > 3) { loadPrevBtn.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Load previous shape or draw new'; } else { document.getElementById('drawStatus').textContent = 'Draw your monster'; } document.getElementById('drawStatus').style.color = '#888'; if (path.length > 3) drawMonster() }
                     else if (d.t === 'full') { postErr('Room full') }
                     else if (d.t === 'invalid') { postErr('Invalid code') }
                 }
@@ -291,8 +291,11 @@
                 // Downsample for stats: keep up to 30 evenly-spaced points
                 var statPts = pts;
                 if (pts.length > 35) { var np = []; for (var i = 0; i < 30; i++)np.push(pts[Math.floor(i * (pts.length - 1) / 29)]); statPts = np }
-                var corners = 0; for (var i = 2; i < statPts.length; i++) {
-                    var a = Math.atan2(statPts[i].y - statPts[i - 1].y, statPts[i].x - statPts[i - 1].x), b = Math.atan2(statPts[i - 1].y - statPts[i - 2].y, statPts[i - 1].x - statPts[i - 2].x);
+                var statN = statPts.length;
+                if (statN > 2 && Math.hypot(statPts[0].x - statPts[statN - 1].x, statPts[0].y - statPts[statN - 1].y) < 5) statN--;
+                var corners = 0; for (var i = 0; i < statN; i++) {
+                    var prev = statPts[(i - 1 + statN) % statN], cur = statPts[i], next = statPts[(i + 1) % statN];
+                    var a = Math.atan2(next.y - cur.y, next.x - cur.x), b = Math.atan2(cur.y - prev.y, cur.x - prev.x);
                     var diff = Math.abs(a - b); if (diff > Math.PI) diff = 2 * Math.PI - diff; if (diff > 1.0) corners++
                 }
                 var cx = 0, cy = 0; for (var i = 0; i < statPts.length; i++) { cx += statPts[i].x; cy += statPts[i].y } cx /= statPts.length; cy /= statPts.length;
@@ -335,7 +338,6 @@
                 }
                 outP = cleanP;
                 var area = 0; for (var i = 0; i < outP.length; i++) { var j2 = (i + 1) % outP.length; area += outP[i][0] * outP[j2][1] - outP[j2][0] * outP[i][1] } area = Math.abs(area) / 2;
-                if (isScotty) return { a: area, c: 20, s: 1.0, l: 5, p: outP, n: 'Scotty' };
                 return { a: area, c: corners, s: sym, l: legs, p: outP, n: (document.getElementById('mname').value || '???').slice(0, 12) }
             }
             function drawMonster() {
@@ -350,7 +352,7 @@
                 var sp = document.getElementById('statsPanel'); sp.style.display = 'block';
                 document.getElementById('statArea').textContent = stats.a + ' → ' + Math.min(150, Math.max(80, Math.round(stats.a * 0.6))) + ' HP';
                 document.getElementById('statCorners').textContent = stats.c + ' → ' + Math.min(stats.c, 5) + ' spikes';
-                document.getElementById('statSym').textContent = (Math.round(stats.s * 100)) + '%';
+                document.getElementById('statSym').textContent = (Math.round(stats.s * 100)) + '% → ' + Math.min(stats.s * 3, 2).toFixed(1) + ' stability';
                 document.getElementById('statLegs').textContent = stats.l + ' → ' + (1.0 + Math.min(stats.l * 0.15, 0.5)).toFixed(2) + 'x speed';
                 document.getElementById('statAbility').textContent = '🎲 Random';
                 document.getElementById('statAbilityRule').textContent = 'Randomly assigned: Dash, Block, or Absorb';
