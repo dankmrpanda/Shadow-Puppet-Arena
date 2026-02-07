@@ -72,8 +72,9 @@ ctx.fillText(Math.ceil(m.hp),m.x,m.y);
 if(m.name){ctx.font=Math.max(9,Math.round(10*sc))+'px sans-serif';ctx.fillText(m.name,m.x,m.y-m.size*1.5-6)}
 }}
 done.onclick=function(){
-if(path.length<10){document.getElementById('drawStatus').textContent='Draw a shape first';return}
-var s=drawMonster();if(!s){document.getElementById('drawStatus').textContent='Draw closed shape first';return}
+if(path.length<10){document.getElementById('drawStatus').textContent='Draw a shape first';document.getElementById('drawStatus').style.color='#e66';return}
+var d=Math.hypot(path[0].x-path[path.length-1].x,path[0].y-path[path.length-1].y);if(d>50){document.getElementById('drawStatus').textContent='Shape not closed! Connect start & end.';document.getElementById('drawStatus').style.color='#e66';return}
+var s=drawMonster();if(!s){document.getElementById('drawStatus').textContent='Draw a valid shape';document.getElementById('drawStatus').style.color='#e66';return}
 ws.send(JSON.stringify({t:'monster',m:s}));isReady=true;done.style.display='none';unready.style.display='inline-block';document.getElementById('drawStatus').textContent='Ready! Waiting for others...'};
 unready.onclick=function(){
 ws.send(JSON.stringify({t:'unready'}));isReady=false;unready.style.display='none';done.style.display='inline-block';document.getElementById('drawStatus').textContent='Draw your monster'};
@@ -81,8 +82,8 @@ function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 function getXY(e){var r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height;var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;return{x:clamp(px*sx,5,W-5),y:clamp(py*sy,5,H-5)}}
 function onDown(e){if(isReady)return;var p=getXY(e);path=[p]}
 function smooth(p){for(var k=0;k<2;k++){var n=[];for(var i=0;i<p.length;i++){var a=p[i-1]||p[0],b=p[i],cc=p[i+1]||p[p.length-1];n.push({x:(a.x+b.x*2+cc.x)/4,y:(a.y+b.y*2+cc.y)/4})}p=n}return p}
-function onMove(e){if(path.length===0||isReady)return;var p=getXY(e);path.push(p);var draw=smooth(path.slice());var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);ctx.fillStyle='rgba(106,76,147,.5)';ctx.beginPath();ctx.moveTo(draw[0].x,draw[0].y);for(var i=1;i<draw.length;i++)ctx.lineTo(draw[i].x,draw[i].y);ctx.closePath();ctx.fill('nonzero');ctx.strokeStyle='#8a6cb8';ctx.lineWidth=3;ctx.stroke()}
-function onUp(){if(path.length<10||isReady)return;path=smooth(path);drawMonster()}
+function onMove(e){if(path.length===0||isReady)return;var p=getXY(e);path.push(p);var draw=smooth(path.slice());var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#8a6cb8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(draw[0].x,draw[0].y);for(var i=1;i<draw.length;i++)ctx.lineTo(draw[i].x,draw[i].y);ctx.stroke()}
+function onUp(){if(path.length<10||isReady)return;path=smooth(path);var d=Math.hypot(path[0].x-path[path.length-1].x,path[0].y-path[path.length-1].y);if(d>50){document.getElementById('drawStatus').textContent='Shape not closed! Connect start & end.';document.getElementById('drawStatus').style.color='#e66';var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);path=[];return}document.getElementById('drawStatus').textContent='Draw your monster';document.getElementById('drawStatus').style.color='#e0e0e0';drawMonster()}
 c.addEventListener('touchstart',function(e){e.preventDefault();onDown(e)});
 c.addEventListener('touchmove',function(e){e.preventDefault();onMove(e)});
 c.addEventListener('touchend',function(e){e.preventDefault();if(e.touches.length===0)onUp()});

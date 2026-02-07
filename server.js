@@ -68,7 +68,7 @@ function tick(roomCode){
     logs.push('Arena shrinks!');
     // Push monsters inward if border crossed them
     for(const id of Object.keys(r.monsters)){
-      const m=r.monsters[id],pad=m.size;
+      const m=r.monsters[id],pad=3;
       if(m.x<r.arenaL+pad){m.x=r.arenaL+pad;m.vx=Math.abs(m.vx)}
       if(m.x>r.arenaR-pad){m.x=r.arenaR-pad;m.vx=-Math.abs(m.vx)}
       if(m.y<r.arenaT+pad){m.y=r.arenaT+pad;m.vy=Math.abs(m.vy)}
@@ -83,7 +83,7 @@ function tick(roomCode){
     m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5);
     m.hp=Math.min(m.hp,m.maxHp);
     m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
-    const pad=m.size;
+    const pad=3;
     if(m.x<r.arenaL+pad){m.vx=Math.abs(m.vx);m.x=r.arenaL+pad}
     if(m.x>r.arenaR-pad){m.vx=-Math.abs(m.vx);m.x=r.arenaR-pad}
     if(m.y<r.arenaT+pad){m.vy=Math.abs(m.vy);m.y=r.arenaT+pad}
