@@ -26,7 +26,7 @@ var st=p[0],en=p[p.length-1],dist=Math.hypot(en.x-st.x,en.y-st.y);
 var turns=0;for(var i=2;i<p.length;i++){var a=Math.atan2(p[i].y-p[i-1].y,p[i].x-p[i-1].x),b=Math.atan2(p[i-1].y-p[i-2].y,p[i-1].x-p[i-2].x);if(Math.abs(a-b)>.5)turns++}
 if(dist<sz*.3&&p.length>15)return 1;
 if(turns>3)return 2;
-if(w>h*1.5||h>w*1.5)return 0;
+if(w>h*1.2||h>w*1.2||turns<=2)return 0;
 return -1;
 }
 function hit(shape){
