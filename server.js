@@ -2,7 +2,7 @@ const http=require('http'),WebSocket=require('ws'),fs=require('fs');
 const rooms={};
 const MAX_PLAYERS=6;
 const ARENA_W=640,ARENA_H=480;
-const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.2,MAX_VEL=1.5;
+const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.6,MAX_VEL=4;
 function code(){var s='';for(var i=0;i<4;i++)s+='ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0];return s}
 const server=http.createServer((req,res)=>{
   const u=req.url.split('?')[0];
@@ -31,9 +31,9 @@ function startArena(roomCode){
     const hp=Math.min(MAX_HP,Math.max(60,Math.floor(m.a/25)));
     r.monsters[pid]={
       x:r.arenaL+80+Math.random()*(ARENA_W-160),y:r.arenaT+60+Math.random()*(ARENA_H-120),
-      vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,
+      vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,
       path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,
-      spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:0.2+Math.min(m.l*0.06,0.3),speed:0,
+      spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:0.6+Math.min(m.l*0.1,0.4),speed:0,
       color:r.colors[pid]||'#9b59b6'
     };
     r.monsters[pid].speed=Math.max(MIN_SPEED,r.monsters[pid].baseSpeed);
@@ -105,8 +105,8 @@ function tick(roomCode){
         const m=r.monsters[id];
         const dx=m.x-bl.x,dy=m.y-bl.y;
         const dist=Math.hypot(dx,dy)||1;
-        if(dist<150){
-          const force=Math.max(2,(150-dist)/5);
+        if(dist<337){
+          const force=Math.max(2,(337-dist)/10);
           m.vx+=dx/dist*force;m.vy+=dy/dist*force;
         }
       }

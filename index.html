@@ -88,9 +88,9 @@ if(m.name){ctx.font=Math.max(9,Math.round(10*sc))+'px sans-serif';ctx.fillText(m
 for(var bi=blastFx.length-1;bi>=0;bi--){
 var bf=blastFx[bi];bf.age++;
 var r=bf.age*4;var alpha=Math.max(0,1-bf.age/20);
-ctx.strokeStyle='rgba(255,100,50,'+alpha+')';ctx.lineWidth=Math.max(1,4-bf.age*0.15);
+ctx.strokeStyle='rgba(255,255,255,'+alpha+')';ctx.lineWidth=Math.max(1,4-bf.age*0.15);
 ctx.beginPath();ctx.arc(bf.x,bf.y,r,0,Math.PI*2);ctx.stroke();
-ctx.strokeStyle='rgba(255,200,50,'+(alpha*0.5)+')';ctx.beginPath();ctx.arc(bf.x,bf.y,r*0.6,0,Math.PI*2);ctx.stroke();
+ctx.strokeStyle='rgba(255,255,255,'+(alpha*0.5)+')';ctx.beginPath();ctx.arc(bf.x,bf.y,r*0.6,0,Math.PI*2);ctx.stroke();
 if(bf.age>20)blastFx.splice(bi,1);
 }
 }
