@@ -1,80 +1,82 @@
-<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Spell Cat</title><style>*{margin:0;padding:0}body{background:#1a0a2e;overflow:hidden;touch-action:none;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#c{background:#2d1b4e;border-radius:8px;display:block;cursor:crosshair;max-width:100%;max-height:70vh;touch-action:none}#s{color:#e8c4ff;font:14px sans-serif;margin-top:8px;text-align:center}</style></head><body><canvas id=c width=280 height=400></canvas><div id=s>— line ○ circle ~ zigzag. Draw to banish!</div><script>
+<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Monster</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:20px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:50vh}#ui{display:none;padding:10px;text-align:center}#battle{display:none;padding:20px;text-align:center}#battle canvas{max-width:100%;margin:10px;border-radius:8px;background:#1a1a24}#log{font-size:12px;max-height:80px;overflow-y:auto;text-align:left;margin-top:10px}</style></head><body><div id=lobby><h1>🦇 Shadow Puppet Monster</h1><p style=margin:10px>Draw a monster. Stats from geometry!</p><button id=create>Create Game</button><br><input id=code placeholder="Game code" maxlength=6><button id=join>Join</button><p id=msg style=margin-top:15px;color:#888></p></div><div id=ui style=display:none><p id=room>Room: -----</p><canvas id=c width=240 height=240></canvas><p id=drawStatus style=margin:8px>Draw your monster silhouette</p><button id=done>Done - Fight!</button></div><div id=battle><h2>⚔️ Battle!</h2><div id=cr></div><div id=log></div></div><script>
 (function(){
-var c=document.getElementById('c'),s=document.getElementById('s'),x=c.getContext('2d');
-var W=280,H=400,path=[],ghosts=[],lives=3,score=0,wave=0;
-var shapes=['—','○','~'];
-function rnd(a,b){return a+Math.random()*(b-a)|0}
-function drawBG(){
-x.fillStyle='#2d1b4e';x.fillRect(0,0,W,H);
-x.fillStyle='#4a2d6e';for(var i=0;i<H;i+=40)x.fillRect(0,i,W,2);
-}
-function addGhost(){
-var sym=rnd(0,3);
-ghosts.push({x:rnd(60,W-60),y:-30,sym:sym,speed:1.2+wave*.2});
-}
-function drawGhost(g){
-x.fillStyle='rgba(255,255,255,.9)';x.beginPath();x.arc(g.x,g.y,25,0,Math.PI*2);x.fill();
-x.fillStyle='#1a0a2e';x.font='bold 20px sans-serif';x.textAlign='center';x.fillText(shapes[g.sym],g.x,g.y+8);
-x.fillStyle='#333';x.beginPath();x.arc(g.x-8,g.y-5,5,0,Math.PI*2);x.arc(g.x+8,g.y-5,5,0,Math.PI*2);x.fill();
-}
-function analyze(p){
-if(p.length<10)return -1;
-var mx=1e9,my=1e9,Mx=-1e9,My=-1e9;
-for(var i=0;i<p.length;i++){mx=Math.min(mx,p[i].x);my=Math.min(my,p[i].y);Mx=Math.max(Mx,p[i].x);My=Math.max(My,p[i].y)}
-var w=Mx-mx,h=My-my,sz=Math.max(w,h,1);
-var st=p[0],en=p[p.length-1],dist=Math.hypot(en.x-st.x,en.y-st.y);
-var turns=0;for(var i=2;i<p.length;i++){var a=Math.atan2(p[i].y-p[i-1].y,p[i].x-p[i-1].x),b=Math.atan2(p[i-1].y-p[i-2].y,p[i-1].x-p[i-2].x);if(Math.abs(a-b)>.5)turns++}
-if(dist<sz*.3&&p.length>15)return 1;
-if(turns>3)return 2;
-if(w>h*1.2||h>w*1.2||turns<=2)return 0;
-return -1;
-}
-function hit(shape){
-for(var i=0;i<ghosts.length;i++)if(ghosts[i].sym===shape)return i;
-return -1;
-}
-function gameLoop(){
-drawBG();
-x.fillStyle='#ff9';x.font='20px sans-serif';x.fillText('♥'.repeat(lives),10,25);
-x.fillText(score,W-50,25);
-x.fillStyle='#e8c4ff';x.font='24px sans-serif';x.textAlign='center';
-x.fillText('🐱',W/2,H-30);
-for(var i=ghosts.length-1;i>=0;i--){
-var g=ghosts[i];g.y+=g.speed;drawGhost(g);
-if(g.y>H-40){ghosts.splice(i,1);lives--;if(lives<=0){s.textContent='Game Over! Tap to restart';return}}}
-if(ghosts.length<2+wave)addGhost();
-if(path.length>1){x.strokeStyle='rgba(255,200,100,.9)';x.lineWidth=6;x.lineCap='round';x.beginPath();x.moveTo(path[0].x,path[0].y);for(var i=1;i<path.length;i++)x.lineTo(path[i].x,path[i].y);x.stroke()}
-requestAnimationFrame(gameLoop);
-}
-function onDown(e){
-var r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
-var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
-path=[{x:px*sx,y:py*sy}];
-}
-function onMove(e){
-if(path.length===0)return;
-var r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
-var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
-path.push({x:px*sx,y:py*sy});
-}
-function onUp(){
-if(path.length<10)return;
-var shape=analyze(path);
-if(shape>=0){
-var idx=hit(shape);
-if(idx>=0){ghosts.splice(idx,1);score+=10;if(score%50===0&&score>0)wave++}
-else s.textContent='No ghost with that symbol!';
-}
-path=[];
-}
+var W=240,H=240,lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),battle=document.getElementById('battle'),c=document.getElementById('c'),msg=document.getElementById('msg'),room=document.getElementById('room'),done=document.getElementById('done'),cr=document.getElementById('cr'),log=document.getElementById('log');
+var ws,path=[],gameCode='',playerId=0,players={},me={},opp={};
+var WS_URL=(location.protocol==='https:'?'wss:':'ws:')+'//'+(location.host||'localhost:3000');
+function post(m){msg.textContent=m;msg.style.color='#888'}
+function postErr(m){msg.textContent=m;msg.style.color='#e66'}
+function connect(){
+try{ws=new WebSocket(WS_URL);
+ws.onopen=function(){post('Connected')};
+ws.onclose=function(){postErr('Disconnected')};
+ws.onmessage=function(e){var d=JSON.parse(e.data);
+if(d.t==='code'){gameCode=d.code;room.textContent='Room: '+gameCode;lobby.querySelector('#code').value=gameCode;post('Share code: '+gameCode)}
+else if(d.t==='joined'){post('Player joined!')}
+else if(d.t==='start'){lobby.style.display='none';ui.style.display='block';c.style.display='block';playerId=d.id}
+else if(d.t==='monster'){players[d.id]=d.m;if(Object.keys(players).length===2)fight()}
+else if(d.t==='full'){postErr('Room full')}
+else if(d.t==='invalid'){postErr('Invalid code')}}
+}catch(e){postErr('No server. Run server.js')}}
+function createGame(){ws.send(JSON.stringify({t:'create'}))}
+function joinGame(){var code=document.getElementById('code').value.toUpperCase();if(code.length!==6){postErr('Code is 6 chars');return}
+ws.send(JSON.stringify({t:'join',code:code}))}
+document.getElementById('create').onclick=createGame;
+document.getElementById('join').onclick=joinGame;
+function analyze(){
+var ctx=c.getContext('2d'),id=ctx.getImageData(0,0,W,H),d=id.data;
+var area=0;for(var i=0;i<d.length;i+=4)if(d[i]>200)area++;
+var pts=path.length>50?path.filter(function(_,i){return i%2===0}):path;
+var corners=0;for(var i=2;i<pts.length;i++){var a=Math.atan2(pts[i].y-pts[i-1].y,pts[i].x-pts[i-1].x),b=Math.atan2(pts[i-1].y-pts[i-2].y,pts[i-1].x-pts[i-2].x);if(Math.abs(a-b)>.7)corners++}
+var cx=0,cy=0;for(var i=0;i<pts.length;i++){cx+=pts[i].x;cy+=pts[i].y}cx/=pts.length;cy/=pts.length;
+var left=0,right=0;for(var i=0;i<pts.length;i++){var v=pts[i].y-cy;if(pts[i].x<cx)left+=v*v;else right+=v*v}
+var sym=Math.min(1,1-Math.abs(left-right)/(left+right+1));
+var segs=[];for(var i=1;i<pts.length;i++)segs.push(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
+var avg=segs.reduce(function(a,b){return a+b},0)/segs.length;var legs=0;for(var i=0;i<segs.length;i++)if(segs[i]>avg*1.8)legs++;
+return{hp:Math.max(10,Math.floor(area/40)),atk:Math.max(1,corners+1),def:Math.max(1,Math.floor(sym*5)+1),spd:Math.max(1,Math.min(legs+1,5))}}
+function drawMonster(){
+var ctx=c.getContext('2d'),pts=path;
+if(pts.length<3)return null;
+ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();
+var stats=analyze();
+ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#2d2d3d';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();
+ctx.strokeStyle='#6a4c93';ctx.lineWidth=2;ctx.stroke();
+return stats}
+function fight(){
+var pids=Object.keys(players);me=players[pids[0]];opp=players[pids[1]];
+if(playerId===2){me=players[pids[1]];opp=players[pids[0]]}
+ui.style.display='none';battle.style.display='block';
+cr.innerHTML='';
+var add=function(t){log.innerHTML+='<div>'+t+'</div>';log.scrollTop=log.scrollHeight};
+add('Monster 1: HP '+me.hp+' ATK '+me.atk+' DEF '+me.def+' SPD '+me.spd);
+add('Monster 2: HP '+opp.hp+' ATK '+opp.atk+' DEF '+opp.def+' SPD '+opp.spd);
+var m1={...me,hp:me.hp},m2={...opp,hp:opp.hp};
+var turn=0;
+function step(){
+turn++;var first,second;if(m1.spd>=m2.spd){first=m1;second=m2}else{first=m2;second=m1}
+var dmg=Math.max(1,Math.floor(first.atk*(10/(10+second.def))));
+second.hp-=dmg;add('Turn '+turn+': '+first.atk+' attack! -'+dmg+' HP');
+if(second.hp<=0){add((second===m1?'Monster 2':'Monster 1')+' wins!');return}
+dmg=Math.max(1,Math.floor(second.atk*(10/(10+first.def))));
+first.hp-=dmg;add('Turn '+turn+': '+second.atk+' counter! -'+dmg+' HP');
+if(first.hp<=0){add((first===m1?'Monster 2':'Monster 1')+' wins!');return}
+setTimeout(step,800)}
+setTimeout(step,500)}
+function onDown(e){var r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height;var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;path=[{x:px*sx,y:py*sy}]}
+function onMove(e){if(path.length===0)return;var r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height;var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;path.push({x:px*sx,y:py*sy});var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#8a6cb8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);for(var i=1;i<path.length;i++)ctx.lineTo(path[i].x,path[i].y);ctx.stroke()}
+function onUp(){if(path.length<10)return;drawMonster()}
+done.onclick=function(){
+var stats=drawMonster();if(!stats){var ds=document.getElementById('drawStatus');if(ds)ds.textContent='Draw a closed shape first';return}
+ws.send(JSON.stringify({t:'monster',m:stats}));done.textContent='Sent! Waiting...';done.disabled=true};
 c.addEventListener('touchstart',function(e){e.preventDefault();onDown(e)});
 c.addEventListener('touchmove',function(e){e.preventDefault();onMove(e)});
 c.addEventListener('touchend',function(e){e.preventDefault();if(e.touches.length===0)onUp()});
 c.addEventListener('mousedown',onDown);
 c.addEventListener('mousemove',function(e){if(e.buttons)onMove(e)});
 c.addEventListener('mouseup',onUp);
-c.addEventListener('mouseleave',function(){if(path.length)path=[]});
-gameLoop();
-document.addEventListener('click',function(){if(lives<=0){lives=3;score=0;wave=0;ghosts=[];s.textContent='— line ○ circle ~ zigzag. Draw to banish!';gameLoop()}});
+connect();
 })();
 </script></body></html>
