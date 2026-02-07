@@ -1,7 +1,7 @@
 const http=require('http'),WebSocket=require('ws'),fs=require('fs');
 const rooms={};
 const MAX_PLAYERS=6;
-const ARENA_W=400,ARENA_H=300;
+const ARENA_W=640,ARENA_H=480;
 function code(){return Math.random().toString(36).slice(2,8).toUpperCase()}
 const server=http.createServer((req,res)=>{
   if(req.url==='/'||req.url==='/index.html'){res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync('index.html','utf8'));return}
@@ -17,43 +17,69 @@ function startArena(roomCode){
   let idx=0;
   for(const pid of Object.keys(r.monsterData)){
     const m=r.monsterData[pid];
-    const size=15+Math.min(m.a/80,25);
+    const baseSize=20+Math.min(m.a/60,30);
     r.monsters[pid]={
-      x:80+Math.random()*240,y:60+Math.random()*180,
+      x:100+Math.random()*440,y:80+Math.random()*320,
       vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,
-      path:m.p,size:size,
-      spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),speed:1+Math.min(m.l*0.3,1.5),
+      path:m.p,baseSize:baseSize,size:baseSize,hp:Math.max(50,Math.floor(m.a/30)),maxHp:0,
+      spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:1+Math.min(m.l*0.3,1.5),speed:0,
       color:COLORS[idx++%6]
     };
+    r.monsters[pid].maxHp=r.monsters[pid].hp;
+    r.monsters[pid].speed=r.monsters[pid].baseSpeed;
   }
+}
+function verts(m){
+  const s=m.size/40,o=[];
+  for(let i=0;i<m.path.length;i++)
+    o.push([m.x+(m.path[i][0]*12-120)*s,m.y+(m.path[i][1]*12-120)*s]);
+  return o;
+}
+function ptInPoly(px,py,v){
+  let n=0;
+  for(let i=0,j=v.length-1;i<v.length;j=i++){
+    if((v[i][1]>py)!==(v[j][1]>py)&&px<(v[j][0]-v[i][0])*(py-v[i][1])/(v[j][1]-v[i][1])+v[i][0])n++;
+  }
+  return n%2===1;
+}
+function polyOverlap(a,b){
+  const va=verts(a),vb=verts(b);
+  for(let i=0;i<va.length;i++)if(ptInPoly(va[i][0],va[i][1],vb))return true;
+  for(let i=0;i<vb.length;i++)if(ptInPoly(vb[i][0],vb[i][1],va))return true;
+  return false;
 }
 function tick(roomCode){
   const r=rooms[roomCode];
   if(!r||!r.monsters)return;
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
+    m.size=Math.max(5,m.baseSize*(m.hp/m.maxHp));
+    m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*0.8);
     m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
-    if(m.x<m.size||m.x>ARENA_W-m.size)m.vx*=-1;
-    if(m.y<m.size||m.y>ARENA_H-m.size)m.vy*=-1;
-    m.x=Math.max(m.size,Math.min(ARENA_W-m.size,m.x));
-    m.y=Math.max(m.size,Math.min(ARENA_H-m.size,m.y));
+    const b=m.size*2;
+    if(m.x<b||m.x>ARENA_W-b)m.vx*=-1;
+    if(m.y<b||m.y>ARENA_H-b)m.vy*=-1;
+    m.x=Math.max(b,Math.min(ARENA_W-b,m.x));
+    m.y=Math.max(b,Math.min(ARENA_H-b,m.y));
   }
   for(const id1 of Object.keys(r.monsters)){
     for(const id2 of Object.keys(r.monsters)){
       if(id1>=id2)continue;
       const a=r.monsters[id1],b=r.monsters[id2];
-      const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy);
-      if(dist<a.size+b.size+5){
-        const nx=dx/dist,ny=dy/dist;
-        const push=(a.spikes-b.stability)*0.5+(b.spikes-a.stability)*0.5;
-        a.vx-=nx*push;a.vy-=ny*push;
-        b.vx+=nx*push;b.vy+=ny*push;
-        const overlap=(a.size+b.size)-dist;
-        a.x-=nx*overlap/2;a.y-=ny*overlap/2;
-        b.x+=nx*overlap/2;b.y+=ny*overlap/2;
-      }
+      if(!polyOverlap(a,b))continue;
+      const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy)||0.1;
+      const nx=dx/dist,ny=dy/dist;
+      const dmg=Math.max(2,(a.spikes-b.stability)*3);
+      a.hp-=dmg;b.hp-=Math.max(2,(b.spikes-a.stability)*3);
+      const push=(a.spikes-b.stability)*0.4+(b.spikes-a.stability)*0.4;
+      a.vx-=nx*push;a.vy-=ny*push;
+      b.vx+=nx*push;b.vy+=ny*push;
+      const sep=(a.size+b.size)*0.15;
+      a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
     }
   }
+  for(const id of Object.keys(r.monsters))
+    if(r.monsters[id].hp<=0)delete r.monsters[id];
   const data=JSON.stringify({t:'arena',m:r.monsters});
   r.players.forEach(p=>{if(p.readyState===1)p.send(data)});
 }
