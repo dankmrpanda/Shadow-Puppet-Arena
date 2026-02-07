@@ -15,18 +15,17 @@ function spawnPack(r){
   var margin=30;
   var x=r.arenaL+margin+Math.random()*(r.arenaR-r.arenaL-margin*2);
   var y=r.arenaT+margin+Math.random()*(r.arenaB-r.arenaT-margin*2);
-  var heal=Math.floor(10+Math.random()*20);
+  var heal=Math.floor(50+Math.random()*76);
   r.packs.push({x:x,y:y,hp:heal});
 }
 
+const COLORS=['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
 function startArena(roomCode){
   const r=rooms[roomCode];
   if(!r||r.started)return;
   r.started=true;
   r.monsters={};r.tick=0;r.arenaL=0;r.arenaT=0;r.arenaR=ARENA_W;r.arenaB=ARENA_H;
   r.packs=[];r.blasts=[];
-  const COLORS=['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
-  let idx=0;
   for(const pid of Object.keys(r.monsterData)){
     const m=r.monsterData[pid];
     const hp=Math.min(MAX_HP,Math.max(60,Math.floor(m.a/25)));
@@ -35,11 +34,10 @@ function startArena(roomCode){
       vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,
       path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,iframes:0,
       spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:1+Math.min(m.l*0.3,1.5),speed:0,
-      color:COLORS[idx++%6]
+      color:r.colors[pid]||'#9b59b6'
     };
     r.monsters[pid].speed=Math.max(MIN_SPEED,r.monsters[pid].baseSpeed);
   }
-  // Spawn initial health packs
   spawnPack(r);spawnPack(r);
 }
 function verts(m){
@@ -66,11 +64,13 @@ function polyOverlap(a,b){
 }
 
 function clampBounds(m,r){
-  const pad=3;
-  if(m.x<r.arenaL+pad){m.vx=Math.abs(m.vx)+0.5;m.x=r.arenaL+pad}
-  if(m.x>r.arenaR-pad){m.vx=-(Math.abs(m.vx)+0.5);m.x=r.arenaR-pad}
-  if(m.y<r.arenaT+pad){m.vy=Math.abs(m.vy)+0.5;m.y=r.arenaT+pad}
-  if(m.y>r.arenaB-pad){m.vy=-(Math.abs(m.vy)+0.5);m.y=r.arenaB-pad}
+  const v=verts(m);
+  let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
+  for(let i=0;i<v.length;i++){mnX=Math.min(mnX,v[i][0]);mxX=Math.max(mxX,v[i][0]);mnY=Math.min(mnY,v[i][1]);mxY=Math.max(mxY,v[i][1])}
+  if(mnX<r.arenaL){m.x+=r.arenaL-mnX;m.vx=Math.abs(m.vx)+0.5}
+  if(mxX>r.arenaR){m.x-=mxX-r.arenaR;m.vx=-(Math.abs(m.vx)+0.5)}
+  if(mnY<r.arenaT){m.y+=r.arenaT-mnY;m.vy=Math.abs(m.vy)+0.5}
+  if(mxY>r.arenaB){m.y-=mxY-r.arenaB;m.vy=-(Math.abs(m.vy)+0.5)}
 }
 
 function tick(roomCode){
@@ -104,7 +104,7 @@ function tick(roomCode){
         const dx=m.x-bl.x,dy=m.y-bl.y;
         const dist=Math.hypot(dx,dy)||1;
         if(dist<120){
-          const force=Math.max(0.5,(120-dist)/30);
+          const force=Math.max(1.5,(120-dist)/10);
           m.vx+=dx/dist*force;m.vy+=dy/dist*force;
         }
       }
@@ -181,17 +181,19 @@ wss.on('connection',ws=>{
     try{const d=JSON.parse(buf);
     if(d.t==='create'){
       const c=code();
-      rooms[c]={players:[ws],monsterData:{},monsters:null,started:false,nextId:2};
+      rooms[c]={players:[ws],monsterData:{},monsters:null,started:false,nextId:2,colors:{},colorIdx:0};
       ws.room=c;ws.id=1;
+      rooms[c].colors[1]=COLORS[rooms[c].colorIdx++%6];
       ws.send(JSON.stringify({t:'code',code:c}));
-      ws.send(JSON.stringify({t:'start',id:1}));
+      ws.send(JSON.stringify({t:'start',id:1,color:rooms[c].colors[1]}));
     }else if(d.t==='join'&&d.code){
       const r=rooms[d.code];
       if(!r){ws.send(JSON.stringify({t:'invalid'}));return}
       if(r.players.length>=MAX_PLAYERS){ws.send(JSON.stringify({t:'full'}));return}
       ws.room=d.code;ws.id=r.nextId++;
+      r.colors[ws.id]=COLORS[r.colorIdx++%6];
       r.players.push(ws);
-      ws.send(JSON.stringify({t:'start',id:ws.id}));
+      ws.send(JSON.stringify({t:'start',id:ws.id,color:r.colors[ws.id]}));
       r.players.forEach(p=>p.send(JSON.stringify({t:'joined',count:r.players.length})));
     }else if(d.t==='monster'&&ws.room&&d.m){
       const r=rooms[ws.room];

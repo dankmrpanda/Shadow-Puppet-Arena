@@ -1,7 +1,7 @@
 <!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Arena</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:15px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#qr{display:none;margin:10px;background:#fff;padding:8px;border-radius:8px}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:50vh;border:2px solid #333}#ui{display:none;padding:10px;text-align:center}#ui input,#ui button{font-size:14px;padding:8px;margin:4px;border-radius:6px;border:1px solid #444}#ui button{background:#4a2d8e;color:#fff}#arena{display:none;width:100%;flex:1;flex-direction:column;align-items:center;padding-top:10px}#ac{background:#1a1a24;border-radius:8px;max-width:100%;max-height:55vh}#qrDraw{display:none;margin:5px}#log{font-size:11px;color:#aaa;max-height:60px;overflow-y:auto;width:90%;text-align:left;padding:6px;background:#151520;border-radius:6px;margin-top:4px}#blastBtn{background:#c0392b;color:#fff;font-size:14px;padding:8px 16px;border:none;border-radius:6px;margin-top:4px;cursor:pointer;display:none}#blastBtn:disabled{background:#555;cursor:default}.hint{font-size:11px;color:#888;margin:4px}</style></head><body><div id=lobby><h1>Shadow Puppet Arena</h1><p style=margin:8px>Draw a monster. Up to 6 players!</p><button id=create>Create Game</button><br><input id=code placeholder="Room code" maxlength=4 style=text-transform:uppercase><button id=join>Join</button><div id=qr></div><p id=msg style=margin-top:15px;color:#888>Connecting...</p></div><div id=ui style=display:none><p id=room>Room: ---</p><div id=qrDraw></div><p id=count></p><input id=mname placeholder="Name your monster" maxlength=12><br><canvas id=c width=300 height=300></canvas><p class=hint>Draw in ONE stroke. Shape will auto-close. Fill it completely!</p><p id=drawStatus style=margin:4px>Draw your monster</p><button id=done>Ready!</button><button id=unready style=display:none;background:#666>Unready</button></div><div id=arena><canvas id=ac width=640 height=480></canvas><button id=blastBtn>Blast (ready)</button><div id=log></div></div><script>
 (function(){
 var lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),arena=document.getElementById('arena'),c=document.getElementById('c'),ac=document.getElementById('ac'),msg=document.getElementById('msg'),room=document.getElementById('room'),count=document.getElementById('count'),qr=document.getElementById('qr'),done=document.getElementById('done'),unready=document.getElementById('unready'),log=document.getElementById('log'),blastBtn=document.getElementById('blastBtn');
-var W=300,H=300,path=[],playerId=0,monsters={},packs=[],ws,isReady=false,bounds=[0,0,640,480];
+var W=300,H=300,path=[],playerId=0,myColor='#6a4c93',monsters={},packs=[],ws,isReady=false,bounds=[0,0,640,480];
 var blastMode=false,blastCooldown=0;
 var WS_URL=(location.protocol==='https:'?'wss:':'ws:')+'//'+(location.host||'localhost:3000');
 var retries=0;
@@ -16,7 +16,7 @@ ws.onmessage=function(e){var d=JSON.parse(e.data);
 if(d.t==='code'){room.textContent='Room: '+d.code;var joinUrl=location.origin+'/join/'+d.code;var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=160x160&data='+encodeURIComponent(joinUrl);qr.innerHTML='<img src="'+qrUrl+'" alt=QR>';qr.style.display='block';document.getElementById('qrDraw').innerHTML='<img src="'+qrUrl+'" alt=QR style=background:#fff;padding:4px;border-radius:6px>';document.getElementById('qrDraw').style.display='block';post('Share QR or code: '+d.code)}
 else if(d.t==='joined'){count.textContent=(d.count||0)+' players';post('Player joined!')}
 else if(d.t==='status'){count.textContent=d.ready+'/'+d.total+' ready'}
-else if(d.t==='start'){lobby.style.display='none';ui.style.display='block';c.style.display='block';playerId=d.id}
+else if(d.t==='start'){lobby.style.display='none';ui.style.display='block';c.style.display='block';playerId=d.id;if(d.color)myColor=d.color}
 else if(d.t==='arena'){monsters=d.m;packs=d.pk||[];if(d.b)bounds=d.b;lobby.style.display='none';ui.style.display='none';arena.style.display='flex';blastBtn.style.display='inline-block';if(d.log)for(var i=0;i<d.log.length;i++)addLog(d.log[i]);renderArena()}
 else if(d.t==='full'){postErr('Room full')}
 else if(d.t==='invalid'){postErr('Invalid code')}}}
@@ -46,7 +46,7 @@ ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);
 ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill('nonzero');
 var stats=analyze();
 ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);
-ctx.fillStyle='#6a4c93';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill('nonzero');
+ctx.fillStyle=myColor;ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill('nonzero');
 var name=document.getElementById('mname').value||'';
 if(name){ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.fillText(name,W/2,20)}
 return stats}
@@ -93,7 +93,7 @@ function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 function getXY(e){var r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height;var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;return{x:clamp(px*sx,5,W-5),y:clamp(py*sy,5,H-5)}}
 function onDown(e){if(isReady)return;var p=getXY(e);path=[p]}
 function smooth(p){for(var k=0;k<2;k++){var n=[];for(var i=0;i<p.length;i++){var a=p[i-1]||p[0],b=p[i],cc=p[i+1]||p[p.length-1];n.push({x:(a.x+b.x*2+cc.x)/4,y:(a.y+b.y*2+cc.y)/4})}p=n}return p}
-function onMove(e){if(path.length===0||isReady)return;var p=getXY(e);path.push(p);var draw=smooth(path.slice());var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#8a6cb8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(draw[0].x,draw[0].y);for(var i=1;i<draw.length;i++)ctx.lineTo(draw[i].x,draw[i].y);ctx.stroke();
+function onMove(e){if(path.length===0||isReady)return;var p=getXY(e);path.push(p);var draw=smooth(path.slice());var ctx=c.getContext('2d');ctx.fillStyle='#1a1a24';ctx.fillRect(0,0,W,H);ctx.strokeStyle=myColor;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(draw[0].x,draw[0].y);for(var i=1;i<draw.length;i++)ctx.lineTo(draw[i].x,draw[i].y);ctx.stroke();
 // Draw closing line hint
 if(draw.length>5){var d=Math.hypot(draw[0].x-draw[draw.length-1].x,draw[0].y-draw[draw.length-1].y);ctx.strokeStyle=d<50?'rgba(46,204,113,0.5)':'rgba(231,76,60,0.3)';ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(draw[draw.length-1].x,draw[draw.length-1].y);ctx.lineTo(draw[0].x,draw[0].y);ctx.stroke();ctx.setLineDash([])}}
 function onUp(){if(path.length<10||isReady)return;path=smooth(path);
@@ -126,7 +126,7 @@ blastBtn.disabled=true;blastBtn.textContent='Blast (10s)';
 var cd=setInterval(function(){blastCooldown--;if(blastCooldown<=0){clearInterval(cd);blastBtn.disabled=false;blastBtn.textContent='Blast (ready)'}else{blastBtn.textContent='Blast ('+blastCooldown+'s)'}},1000)}
 ac.addEventListener('click',onArenaClick);
 ac.addEventListener('touchstart',function(e){if(blastMode){e.preventDefault();onArenaClick(e)}});
-setInterval(function(){if(arena.style.display==='flex'&&Object.keys(monsters).length)renderArena()},50);
+setInterval(function(){if(arena.style.display==='flex'&&Object.keys(monsters).length)renderArena()},33);
 connect();
 })();
 </script></body></html>
