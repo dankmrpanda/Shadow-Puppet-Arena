@@ -43,10 +43,10 @@ const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'
 
 // Detect shape ability based on stats
 function detectAbility(m) {
-  if (m.c >= 5) return 'spikeBurst'; // Star shape - AoE damage
+  // spikeBurst removed
   if (m.c <= 1 && m.s > 0.7) return 'absorb'; // Circle - heal on hit
   if (m.l >= 3) return 'dash'; // Snake/tentacles - speed burst
-  if (m.c === 4) return 'block'; // Square - temp invincibility
+  if (m.c >= 4) return 'block'; // Square/Star shape - invincibility
   return 'none';
 }
 
@@ -482,28 +482,7 @@ wss.on('connection', ws => {
           const me = r.monsters[ws.id];
           if (me.abilityCooldown > 0 || me.ability === 'none') return;
           me.abilityCooldown = 600; // 10 second cooldown
-          if (me.ability === 'spikeBurst') {
-            // Calculate radius based on outermost vertex
-            const v = verts(me);
-            let maxDist = 0;
-            for (let i = 0; i < v.length; i++) {
-              const d = Math.hypot(v[i][0] - me.x, v[i][1] - me.y);
-              if (d > maxDist) maxDist = d;
-            }
-            const abilityRadius = Math.max(100, maxDist * 4);
-            me.abilityRadius = abilityRadius; // Store for client
-            // AoE damage pulse
-            for (const id of Object.keys(r.monsters)) {
-              if (id == ws.id) continue;
-              const other = r.monsters[id];
-              const dist = Math.hypot(other.x - me.x, other.y - me.y);
-              if (dist < abilityRadius && !other.effects.shield) {
-                other.hp -= 20;
-                r.floatTexts.push({ x: other.x, y: other.y - 20, text: '-20💥', color: '#f00' });
-              }
-            }
-            r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'SPIKE BURST!', color: '#f80' });
-          } else if (me.ability === 'dash') {
+          if (me.ability === 'dash') {
             // Speed burst
             me.effects.speed = 180; // 3 second super speed
             const vel = Math.hypot(me.vx, me.vy) || 1;

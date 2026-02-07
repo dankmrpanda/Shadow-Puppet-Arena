@@ -285,8 +285,8 @@
                 if (name) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, W / 2, 20) }
                 return stats
             }
-            var abilityDescs = { spikeBurst: 'AoE damage burst', dash: 'Speed burst forward', block: 'Invincible 3s', absorb: 'Heal on hit (passive)', none: '' };
-            var abilityIcons = { spikeBurst: '💥', dash: '⚡', block: '🛡', absorb: '💚', none: '' };
+            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 3s', absorb: 'Heal on hit (passive)', none: '' };
+            var abilityIcons = { dash: '⚡', block: '🛡', absorb: '💚', none: '' };
             var puLabels = { speed: '2x SPEED', shield: 'SHIELD', damage: '2x DMG', ghost: 'PHASE' };
             function renderArena() {
                 var ctx = ac.getContext('2d');
@@ -507,7 +507,7 @@
             blastBtn.onclick = function () {
                 if (blastCooldown > 0 || isDead) return;
                 ws.send(JSON.stringify({ t: 'blast' }));
-                blastCooldown = 10; blastBtn.disabled = true;
+                blastCooldown = 3; blastBtn.disabled = true;
                 var cd = setInterval(function () { blastCooldown--; updateButtons(); if (blastCooldown <= 0) { clearInterval(cd); if (!isDead) { blastBtn.disabled = false; blastBtn.style.background = '' } } }, 1000);
                 updateButtons();
             };

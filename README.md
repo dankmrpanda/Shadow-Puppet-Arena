@@ -37,10 +37,9 @@ Shapes unlock a unique ability based on their geometry:
 
 | Shape Type | Ability | Effect |
 |------------|---------|--------|
-| **Star** (5+ corners) | **Spike Burst** | 20 AoE damage to all enemies within range |
 | **Circle** (≤1 corner, high symmetry) | **Absorb** | Passive: Heal for 50% of damage dealt on collision |
 | **Snake** (3+ long segments) | **Dash** | 3s speed burst + instant velocity boost |
-| **Square** (exactly 4 corners) | **Block** | 3s invincibility shield |
+| **Square/Star** (4+ corners) | **Block** | 3s invincibility shield |
 
 Abilities have a **10-second cooldown** (shown on the button).
 
@@ -81,7 +80,7 @@ Appear later in the match as the battle intensifies:
 - **Health Packs** (green ✚) spawn periodically — heal 20–50 HP on pickup
 - **Arena Shrinks** every ~10 seconds — border turns red, out-of-bounds area is deadly
 - **Sudden Death** triggers when the arena is very small — all unshielded shapes take 2 damage/second
-- **Blast** (Space / button) — pushes all nearby enemies away with a shockwave (10s cooldown)
+- **Blast** (Space / button) — pushes all nearby enemies away with a shockwave (3s cooldown)
 
 ### Controls
 
@@ -97,7 +96,7 @@ Click the **Load Scotty** button on the draw screen to load a pre-made Scottish 
 
 ### Tips
 
-- Draw a **star** for offense (Spike Burst) or a **circle** for tankiness (Absorb)
+- Draw a **star** for Block or a **circle** for tankiness (Absorb)
 - Use **Blast** to push enemies into the shrinking border for sudden death damage
 - **Charge** at enemies at full speed for bonus velocity damage
 - Pick up **Ghost** to safely reposition, then ambush when it wears off

@@ -240,10 +240,9 @@
                 hazards.push({ x: x, y: y, type: type, age: 0, duration: type === 'fire' ? 375 : 500 })
             }
             function detectAbility(s) {
-                if (s.c >= 5) return 'spikeBurst';
                 if (s.c <= 1 && s.s > 0.7) return 'absorb';
                 if (s.l >= 3) return 'dash';
-                if (s.c === 4) return 'block';
+                if (s.c >= 4) return 'block';
                 return 'none'
             }
             function makeStats(p) {
@@ -327,8 +326,7 @@
                             for (var oid in monsters) { if (oid != id && monsters[oid].hp > 0) { var d = Math.hypot(monsters[oid].x - m.x, monsters[oid].y - m.y); if (d < bestD) { bestD = d; bestT = oid } } }
                             m.target = bestT;
                             if (m.ability !== 'none' && m.abilityCooldown <= 0) {
-                                if (m.ability === 'spikeBurst' && bestD < 100) useAbility(id);
-                                else if (m.ability === 'dash' && bestD > 150) useAbility(id);
+                                if (m.ability === 'dash' && bestD > 150) useAbility(id);
                                 else if (m.ability === 'block' && bestD < 80) useAbility(id);
                             }
                             if (bestD < 100 && Math.random() < 0.3) blast(id);
@@ -424,14 +422,7 @@
             function useAbility(id) {
                 var m = monsters[id]; if (!m || m.hp <= 0 || m.ability === 'none' || m.abilityCooldown > 0) return;
                 m.abilityCooldown = 600;
-                if (m.ability === 'spikeBurst') {
-                    for (var oid in monsters) {
-                        if (oid != id && monsters[oid].hp > 0 && Math.hypot(monsters[oid].x - m.x, monsters[oid].y - m.y) < 250) {
-                            monsters[oid].hp -= 20; floatTexts.push({ x: monsters[oid].x, y: monsters[oid].y - 20, text: '-20', color: '#f00', age: 0 })
-                        }
-                    }
-                    floatTexts.push({ x: m.x, y: m.y - 30, text: 'SPIKE BURST!', color: '#f80', age: 0 })
-                } else if (m.ability === 'dash') {
+                if (m.ability === 'dash') {
                     m.effects.speed = 180; var v = Math.hypot(m.vx, m.vy) || 1; m.vx = m.vx / v * 4; m.vy = m.vy / v * 4;
                     floatTexts.push({ x: m.x, y: m.y - 30, text: 'DASH!', color: '#0ff', age: 0 })
                 } else if (m.ability === 'block') {
@@ -577,7 +568,7 @@
 
             var blastCooldown = 0, keys = {};
             document.addEventListener('keydown', function (e) { keys[e.key] = true }); document.addEventListener('keyup', function (e) { keys[e.key] = false });
-            if (blastBtn) blastBtn.onclick = function () { if (!monsters[0] || blastCooldown > 0) return; blast(0); blastCooldown = 600 };
+            if (blastBtn) blastBtn.onclick = function () { if (!monsters[0] || blastCooldown > 0) return; blast(0); blastCooldown = 180 };
             if (abilityBtn) abilityBtn.onclick = function () { if (!monsters[0]) return; useAbility(0) };
 
             setInterval(function () {
