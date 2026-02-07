@@ -32,7 +32,7 @@ function startArena(roomCode){
     r.monsters[pid]={
       x:r.arenaL+80+Math.random()*(ARENA_W-160),y:r.arenaT+60+Math.random()*(ARENA_H-120),
       vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,
-      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,
+      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,iframes:0,
       spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:0.6+Math.min(m.l*0.1,0.4),speed:0,
       color:r.colors[pid]||'#9b59b6'
     };
@@ -114,6 +114,7 @@ function tick(roomCode){
     }
     r.blasts=[];
   }
+  for(const id of Object.keys(r.monsters))if(r.monsters[id].iframes>0)r.monsters[id].iframes--;
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
     m.size=Math.max(8,m.baseSize*(m.hp/m.maxHp));
@@ -149,16 +150,20 @@ function tick(roomCode){
       if(!polyOverlap(a,b))continue;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy)||0.1;
       const nx=dx/dist,ny=dy/dist;
-      const dmgA=Math.min(15,Math.max(1,Math.round((b.spikes-a.stability)*3)));
-      const dmgB=Math.min(15,Math.max(1,Math.round((a.spikes-b.stability)*3)));
-      a.hp-=dmgA;b.hp-=dmgB;
-      logs.push(a.name+' -'+dmgA+' / '+b.name+' -'+dmgB);
+      // Push always happens
       const push=Math.max(0.15,(a.spikes-b.stability+b.spikes-a.stability)*0.08);
       a.vx-=nx*push;a.vy-=ny*push;
       b.vx+=nx*push;b.vy+=ny*push;
       const sep=(a.size+b.size)*0.1;
       a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
       clampBounds(a,r);clampBounds(b,r);
+      // Damage only if no iframes
+      if(a.iframes<=0&&b.iframes<=0){
+        const dmgA=Math.min(15,Math.max(1,Math.round((b.spikes-a.stability)*3)));
+        const dmgB=Math.min(15,Math.max(1,Math.round((a.spikes-b.stability)*3)));
+        a.hp-=dmgA;b.hp-=dmgB;a.iframes=20;b.iframes=20;
+        logs.push(a.name+' -'+dmgA+' / '+b.name+' -'+dmgB);
+      }
     }
   }
   for(const id of Object.keys(r.monsters)){
