@@ -1,32 +1,86 @@
-<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Loading Bar</title><style>*{margin:0;padding:0}body{background:#0a0a0f;color:#fff;font:16px system-ui;overflow:hidden;touch-action:none;user-select:none;height:100vh;display:flex;flex-direction:column}#g{flex:1;position:relative;background:linear-gradient(180deg,#1a1a2e 0%,#0a0a0f 100%)}#p{position:absolute;bottom:30px;left:0;width:10%;height:24px;background:linear-gradient(90deg,#00ff88,#00ccff);border-radius:4px;box-shadow:0 0 20px rgba(0,255,136,.5);transition:left .08s linear}.e{position:absolute;color:#ff4444;font:bold 10px monospace;text-shadow:0 0 4px red}.b{position:absolute;bottom:0;left:0;height:4px;background:linear-gradient(90deg,#00ff88,#00ccff);transition:width .1s}#b{position:absolute;bottom:0;left:0;right:0;height:4px}#u{position:absolute;top:0;right:0;bottom:0;width:0;background:rgba(0,0,0,.4);pointer-events:none}#t{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:14px;opacity:.9}#s{position:absolute;bottom:56px;left:0;right:0;text-align:center;font-size:12px;opacity:.6}</style></head><body><div id=g><div id=p></div><div id=u></div><div id=b><div class=b style=width:10%></div></div><div id=t>10%</div><div id=s>Tap left/right to dodge errors</div></div><script>
+<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Spell Cat</title><style>*{margin:0;padding:0}body{background:#1a0a2e;overflow:hidden;touch-action:none;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#c{background:#2d1b4e;border-radius:8px;display:block;cursor:crosshair;max-width:100%;max-height:70vh;touch-action:none}#s{color:#e8c4ff;font:14px sans-serif;margin-top:8px;text-align:center}</style></head><body><canvas id=c width=280 height=400></canvas><div id=s>— line ○ circle ~ zigzag. Draw on ghosts!</div><script>
 (function(){
-var g=document.getElementById('g'),p=document.getElementById('p'),u=document.getElementById('u'),b=document.querySelector('.b'),t=document.getElementById('t'),s=document.getElementById('s');
-var px,errors=[],prog=10,spawn=0,run=1;function dim(){var w=g.offsetWidth||innerWidth,h=g.offsetHeight||innerHeight;return{w:w,h:h}}var W=dim().w,H=dim().h;px=0;
-function rnd(a,b){return a+Math.random()*(b-a)}
-function tick(){
-if(!run)return;var d=dim();W=d.w;H=d.h;
-prog+=.04;spawn++;
-var pw=W*.1,loaded=W*(prog/100),minPx=0,maxPx=Math.max(0,loaded-pw);
-if(spawn>Math.max(12,55-prog*.45)){spawn=0;var el=document.createElement('div');el.className='e';el.textContent='ERR';g.appendChild(el);errors.push({x:rnd(5,Math.max(15,loaded-35)),y:-20,el:el})}
-px=Math.max(minPx,Math.min(maxPx,px));
-p.style.left=px+'px';
-b.style.width=Math.min(100,prog)+'%';u.style.width=(100-Math.min(100,prog))+'%';
-t.textContent=Math.floor(Math.min(100,prog))+'%';
-if(prog>=100){run=0;t.textContent='100% Complete!';s.textContent='You win!';return}
-var sp=.8+prog*.04;
-for(var i=errors.length-1;i>=0;i--){
-var e=errors[i];e.y+=sp;
-e.el.style.left=e.x+'px';e.el.style.top=e.y+'px';
-if(e.y>H-60){e.el.remove();errors.splice(i,1);continue}
-if(e.y+20>H-55&&e.y<H-30&&e.x+40>px&&e.x<px+pw){run=0;t.textContent='Crashed!';s.textContent='Tap to retry';errors.forEach(function(x){x.el.remove()});errors=[];return}}
-requestAnimationFrame(tick)}
-function move(e){
-var r=g.getBoundingClientRect(),x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
-px=x-r.width*.05}
-g.addEventListener('touchstart',function(e){if(!run){prog=0;errors=[];run=1;g.querySelectorAll('.e').forEach(function(x){x.remove()});prog=10;b.style.width='10%';u.style.width='90%';t.textContent='10%';tick();s.textContent='Tap left/right to dodge'}else move(e)});
-g.addEventListener('touchmove',function(e){e.preventDefault();move(e)});
-g.addEventListener('mousedown',function(e){if(!run){prog=0;errors=[];run=1;g.querySelectorAll('.e').forEach(function(x){x.remove()});prog=10;b.style.width='10%';u.style.width='90%';t.textContent='10%';tick();s.textContent='Tap left/right to dodge'}else move(e)});
-g.addEventListener('mousemove',function(e){if(e.buttons)move(e)});
-tick();
+var c=document.getElementById('c'),s=document.getElementById('s'),x=c.getContext('2d');
+var W=280,H=400,path=[],ghosts=[],lives=3,score=0,wave=0;
+var shapes=['—','○','~'];
+function rnd(a,b){return a+Math.random()*(b-a)|0}
+function drawBG(){
+x.fillStyle='#2d1b4e';x.fillRect(0,0,W,H);
+x.fillStyle='#4a2d6e';for(var i=0;i<H;i+=40)x.fillRect(0,i,W,2);
+}
+function addGhost(){
+var sym=rnd(0,3);
+ghosts.push({x:rnd(60,W-60),y:-30,sym:sym,speed:1.2+wave*.2});
+}
+function drawGhost(g){
+x.fillStyle='rgba(255,255,255,.9)';x.beginPath();x.arc(g.x,g.y,25,0,Math.PI*2);x.fill();
+x.fillStyle='#1a0a2e';x.font='bold 20px sans-serif';x.textAlign='center';x.fillText(shapes[g.sym],g.x,g.y+8);
+x.fillStyle='#333';x.beginPath();x.arc(g.x-8,g.y-5,5,0,Math.PI*2);x.arc(g.x+8,g.y-5,5,0,Math.PI*2);x.fill();
+}
+function analyze(p){
+if(p.length<10)return -1;
+var mx=1e9,my=1e9,Mx=-1e9,My=-1e9;
+for(var i=0;i<p.length;i++){mx=Math.min(mx,p[i].x);my=Math.min(my,p[i].y);Mx=Math.max(Mx,p[i].x);My=Math.max(My,p[i].y)}
+var w=Mx-mx,h=My-my,sz=Math.max(w,h,1);
+var st=p[0],en=p[p.length-1],dist=Math.hypot(en.x-st.x,en.y-st.y);
+var turns=0;for(var i=2;i<p.length;i++){var a=Math.atan2(p[i].y-p[i-1].y,p[i].x-p[i-1].x),b=Math.atan2(p[i-1].y-p[i-2].y,p[i-1].x-p[i-2].x);if(Math.abs(a-b)>.5)turns++}
+if(dist<sz*.3&&p.length>15)return 1;
+if(turns>3)return 2;
+if(w>h*1.5||h>w*1.5)return 0;
+return -1;
+}
+function hit(shape){
+var cx=0,cy=0;for(var i=0;i<path.length;i++){cx+=path[i].x;cy+=path[i].y}
+cx/=path.length;cy/=path.length;
+var d=100,t=-1;
+for(var i=0;i<ghosts.length;i++){
+var dist=Math.hypot(ghosts[i].x-cx,ghosts[i].y-cy);
+if(ghosts[i].sym===shape&&dist<d){d=dist;t=i}}
+return t;
+}
+function gameLoop(){
+drawBG();
+x.fillStyle='#ff9';x.font='20px sans-serif';x.fillText('♥'.repeat(lives),10,25);
+x.fillText(score,W-50,25);
+x.fillStyle='#e8c4ff';x.font='24px sans-serif';x.textAlign='center';
+x.fillText('🐱',W/2,H-30);
+for(var i=ghosts.length-1;i>=0;i--){
+var g=ghosts[i];g.y+=g.speed;drawGhost(g);
+if(g.y>H-40){ghosts.splice(i,1);lives--;if(lives<=0){s.textContent='Game Over! Tap to restart';return}}}
+if(ghosts.length<2+wave)addGhost();
+requestAnimationFrame(gameLoop);
+}
+function onDown(e){
+var r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
+var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+path=[{x:px*sx,y:py*sy}];
+}
+function onMove(e){
+if(path.length===0)return;
+var r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
+var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+path.push({x:px*sx,y:py*sy});
+x.strokeStyle='rgba(255,200,100,.8)';x.lineWidth=6;x.lineCap='round';
+x.beginPath();x.moveTo(path[path.length-2].x,path[path.length-2].y);x.lineTo(path[path.length-1].x,path[path.length-1].y);x.stroke();
+}
+function onUp(){
+if(path.length<10)return;
+var shape=analyze(path);
+if(shape>=0){
+var idx=hit(shape);
+if(idx>=0){ghosts.splice(idx,1);score+=10;if(score%50===0&&score>0)wave++}
+else s.textContent='Miss! Draw on ghosts';
+}
+path=[];
+}
+c.addEventListener('touchstart',function(e){e.preventDefault();onDown(e)});
+c.addEventListener('touchmove',function(e){e.preventDefault();onMove(e)});
+c.addEventListener('touchend',function(e){e.preventDefault();if(e.touches.length===0)onUp()});
+c.addEventListener('mousedown',onDown);
+c.addEventListener('mousemove',function(e){if(e.buttons)onMove(e)});
+c.addEventListener('mouseup',onUp);
+c.addEventListener('mouseleave',function(){if(path.length)path=[]});
+gameLoop();
+document.addEventListener('click',function(){if(lives<=0){lives=3;score=0;wave=0;ghosts=[];s.textContent='— line ○ circle ~ zigzag. Draw on ghosts!';gameLoop()}});
 })();
 </script></body></html>
