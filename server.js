@@ -147,15 +147,29 @@ function tick(roomCode) {
     for (const id of Object.keys(r.monsters)) { var m = r.monsters[id]; m.baseSpeed = Math.min(1.5, m.baseSpeed + 0.03) }
     logs.push('Speed up!');
   }
-  // Shrink arena - increments grow over time
-  if (r.tick % 900 === 0 && (r.arenaR - r.arenaL) > 180) {
-    var phase = Math.floor(r.tick / 900);
-    var shrinkX = Math.min(12, 4 + phase);
-    var shrinkY = Math.min(10, 3 + Math.floor(phase * 0.7));
-    r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
+  // Shrink arena - increments grow over time, much faster in 1v1
+  var aliveCount = Object.keys(r.monsters).length;
+  var is1v1 = aliveCount === 2;
+  // Normal: every 900 ticks (~14s). 1v1: every 300 ticks (~5s) by percentage
+  var shrinkInterval = is1v1 ? 300 : 900;
+  if (r.tick % shrinkInterval === 0 && (r.arenaR - r.arenaL) > 180) {
+    var currentW = r.arenaR - r.arenaL;
+    var currentH = r.arenaB - r.arenaT;
+    if (is1v1) {
+      // Percentage-based shrink: 8% of current dimensions each time
+      var shrinkX = Math.max(6, Math.round(currentW * 0.08));
+      var shrinkY = Math.max(5, Math.round(currentH * 0.08));
+      r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
+      logs.push('1v1! Arena closing fast!');
+    } else {
+      var phase = Math.floor(r.tick / 900);
+      var shrinkX = Math.min(12, 4 + phase);
+      var shrinkY = Math.min(10, 3 + Math.floor(phase * 0.7));
+      r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
+      logs.push('Arena shrinks!');
+    }
     if (r.arenaR - r.arenaL < 180) { r.arenaL = (r.arenaL + r.arenaR) / 2 - 90; r.arenaR = r.arenaL + 180 }
     if (r.arenaB - r.arenaT < 130) { r.arenaT = (r.arenaT + r.arenaB) / 2 - 65; r.arenaB = r.arenaT + 130 }
-    logs.push('Arena shrinks!');
     for (const id of Object.keys(r.monsters)) clampBounds(r.monsters[id], r);
     // Remove health packs outside new bounds
     for (let pi = r.packs.length - 1; pi >= 0; pi--) {
@@ -164,7 +178,6 @@ function tick(roomCode) {
     }
   }
   // Spawn health packs - slower rate as arena shrinks
-  var aliveCount = Object.keys(r.monsters).length;
   var phase = Math.floor(r.tick / 900);
   var packRate = (aliveCount <= 2 ? 450 : aliveCount <= 3 ? 750 : 1200) + phase * 100;
   if (r.tick % packRate === 0 && r.packs.length < 3) spawnPack(r);
@@ -345,14 +358,29 @@ function tick(roomCode) {
         const velMultB = 0.5 + (velB / MAX_VEL) * 1.5;
         const baseDmgA = (b.spikes - a.stability) * 2.5 * (b.effects.damage ? 2 : 1);
         const baseDmgB = (a.spikes - b.stability) * 2.5 * (a.effects.damage ? 2 : 1);
-        const dmgA = a.effects.shield ? 0 : Math.min(20, Math.max(1, Math.round(baseDmgA * velMultB)));
-        const dmgB = b.effects.shield ? 0 : Math.min(20, Math.max(1, Math.round(baseDmgB * velMultA)));
+        var rawDmgA = a.effects.shield ? 0 : Math.min(20, Math.max(1, Math.round(baseDmgA * velMultB)));
+        var rawDmgB = b.effects.shield ? 0 : Math.min(20, Math.max(1, Math.round(baseDmgB * velMultA)));
+        // Absorb ability (active): reflect damage to attacker, heal self
+        var dmgA = rawDmgA, dmgB = rawDmgB;
+        if (a.effects.absorb && rawDmgA > 0) {
+          // A has absorb active: damage meant for A is reflected to B and heals A
+          dmgA = 0;
+          b.hp -= rawDmgA;
+          a.hp = Math.min(a.maxHp, a.hp + rawDmgA);
+          r.floatTexts.push({ x: a.x, y: a.y - 20, text: '+' + rawDmgA, color: '#2f2' });
+          r.floatTexts.push({ x: b.x, y: b.y - 35, text: '-' + rawDmgA + ' REFLECTED', color: '#f0f' });
+        }
+        if (b.effects.absorb && rawDmgB > 0) {
+          // B has absorb active: damage meant for B is reflected to A and heals B
+          dmgB = 0;
+          a.hp -= rawDmgB;
+          b.hp = Math.min(b.maxHp, b.hp + rawDmgB);
+          r.floatTexts.push({ x: b.x, y: b.y - 20, text: '+' + rawDmgB, color: '#2f2' });
+          r.floatTexts.push({ x: a.x, y: a.y - 35, text: '-' + rawDmgB + ' REFLECTED', color: '#f0f' });
+        }
         a.hp -= dmgA; b.hp -= dmgB; a.iframes = 25; b.iframes = 25;
         if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA, color: velMultB > 1.2 ? '#ff0' : '#f55' });
         if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB, color: velMultA > 1.2 ? '#ff0' : '#f55' });
-        // Absorb ability: heal on hit
-        if (a.ability === 'absorb' && dmgB > 0) a.hp = Math.min(a.maxHp, a.hp + Math.ceil(dmgB * 0.75));
-        if (b.ability === 'absorb' && dmgA > 0) b.hp = Math.min(b.maxHp, b.hp + Math.ceil(dmgA * 0.75));
         logs.push(a.name + ' -' + dmgA + ' / ' + b.name + ' -' + dmgB);
       }
     }
@@ -471,8 +499,11 @@ wss.on('connection', ws => {
             // Temp invincibility
             me.effects.shield = 240; // ~4 seconds
             r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'BLOCK!', color: '#88f' });
+          } else if (me.ability === 'absorb') {
+            // 2 second absorb window: reflect damage and heal
+            me.effects.absorb = 120; // ~2 seconds at 60 ticks/s
+            r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'ABSORB!', color: '#2f2' });
           }
-          // absorb is passive, handled in collision
         }
       }
     }

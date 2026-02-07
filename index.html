@@ -198,6 +198,26 @@
         <p id=count></p><input id=mname placeholder="Name your shape" maxlength=12><br><canvas id=c width=300
             height=300></canvas>
         <p class=hint>Draw in ONE stroke. Shape will auto-close.</p>
+        <div id=statsPanel style="margin:6px;padding:8px;background:rgba(20,20,35,0.9);border-radius:8px;border:1px solid #444;font-size:11px;display:none;max-width:320px;text-align:left">
+            <div style="font-weight:bold;text-align:center;color:#ccc;margin-bottom:4px">Shape Analysis</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
+                <div>📐 <b>Area</b>: <span id=statArea>-</span></div>
+                <div style=color:#888;font-size:10px>→ HP (bigger=more HP)</div>
+                <div>📐 <b>Corners</b>: <span id=statCorners>-</span></div>
+                <div style=color:#888;font-size:10px>→ Spikes/Dmg dealt</div>
+                <div>⚖ <b>Symmetry</b>: <span id=statSym>-</span></div>
+                <div style=color:#888;font-size:10px>→ Stability/Defense</div>
+                <div>🦵 <b>Legs</b>: <span id=statLegs>-</span></div>
+                <div style=color:#888;font-size:10px>→ Base speed</div>
+            </div>
+            <div style="margin-top:6px;padding-top:5px;border-top:1px solid #333">
+                <div style="text-align:center"><b>Ability:</b> <span id=statAbility style=color:#9b59b6>-</span></div>
+                <div id=statAbilityRule style="text-align:center;color:#666;font-size:10px;margin-top:2px"></div>
+            </div>
+            <div style="margin-top:4px;padding-top:4px;border-top:1px solid #222;color:#666;font-size:9px;text-align:center">
+                ⚡ Dash: 3+ legs &nbsp;|&nbsp; 🛡 Block: 4+ corners &nbsp;|&nbsp; 💚 Absorb: ≤1 corner + high symmetry
+            </div>
+        </div>
         <p id=drawStatus style=margin:4px>Draw your monster</p><button id=loadPrev
             style=display:none;background:#2980b9>Load Previous</button><button id=loadScotty
             style=background:#c0392b;margin-left:4px>Load Scotty 🐕</button><button id=clear>Clear</button><button
@@ -258,20 +278,60 @@
             function analyze() {
                 var p = path;
                 var pts = []; for (var i = 0; i < p.length; i++) pts.push({ x: p[i].x, y: p[i].y });
-                if (pts.length > 25) { var np = []; for (var i = 0; i < 20; i++)np.push(pts[Math.floor(i * (pts.length - 1) / 19)]); pts = np }
-                var corners = 0; for (var i = 2; i < pts.length; i++) {
-                    var a = Math.atan2(pts[i].y - pts[i - 1].y, pts[i].x - pts[i - 1].x), b = Math.atan2(pts[i - 1].y - pts[i - 2].y, pts[i - 1].x - pts[i - 2].x);
+                // Compute curvature at each point to identify sharp features (gear teeth etc)
+                var curvatures = [];
+                for (var i = 0; i < pts.length; i++) {
+                    var prev = pts[(i - 1 + pts.length) % pts.length], cur = pts[i], next = pts[(i + 1) % pts.length];
+                    var a2 = Math.atan2(next.y - cur.y, next.x - cur.x), b2 = Math.atan2(cur.y - prev.y, cur.x - prev.x);
+                    var diff2 = Math.abs(a2 - b2); if (diff2 > Math.PI) diff2 = 2 * Math.PI - diff2;
+                    curvatures.push(diff2);
+                }
+                // Downsample for stats: keep up to 30 evenly-spaced points
+                var statPts = pts;
+                if (pts.length > 35) { var np = []; for (var i = 0; i < 30; i++)np.push(pts[Math.floor(i * (pts.length - 1) / 29)]); statPts = np }
+                var corners = 0; for (var i = 2; i < statPts.length; i++) {
+                    var a = Math.atan2(statPts[i].y - statPts[i - 1].y, statPts[i].x - statPts[i - 1].x), b = Math.atan2(statPts[i - 1].y - statPts[i - 2].y, statPts[i - 1].x - statPts[i - 2].x);
                     var diff = Math.abs(a - b); if (diff > Math.PI) diff = 2 * Math.PI - diff; if (diff > 1.0) corners++
                 }
-                var cx = 0, cy = 0; for (var i = 0; i < pts.length; i++) { cx += pts[i].x; cy += pts[i].y } cx /= pts.length; cy /= pts.length;
-                var left = 0, right = 0; for (var i = 0; i < pts.length; i++) { var v = pts[i].y - cy; if (pts[i].x < cx) left += v * v; else right += v * v }
+                var cx = 0, cy = 0; for (var i = 0; i < statPts.length; i++) { cx += statPts[i].x; cy += statPts[i].y } cx /= statPts.length; cy /= statPts.length;
+                var left = 0, right = 0; for (var i = 0; i < statPts.length; i++) { var v = statPts[i].y - cy; if (statPts[i].x < cx) left += v * v; else right += v * v }
                 var sym = Math.min(1, 1 - Math.abs(left - right) / (left + right + 1));
-                var segs = []; for (var i = 1; i < pts.length; i++)segs.push(Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+                var segs = []; for (var i = 1; i < statPts.length; i++)segs.push(Math.hypot(statPts[i].x - statPts[i - 1].x, statPts[i].y - statPts[i - 1].y));
                 var avg = segs.reduce(function (a, b) { return a + b }, 0) / segs.length; var legs = 0; for (var i = 0; i < segs.length; i++)if (segs[i] > avg * 1.8) legs++;
 
                 var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < pts.length; i++) { mx = Math.min(mx, pts[i].x); my = Math.min(my, pts[i].y); Mx = Math.max(Mx, pts[i].x); My = Math.max(My, pts[i].y) }
                 var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
-                var outP = []; var ns = Math.min(pts.length, 20); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (pts.length - 1) / (ns - 1)); outP.push([Math.round((pts[j].x * sc + ox) / 12), Math.round((pts[j].y * sc + oy) / 12)]) }
+                // Feature-preserving downsampling: keep high-curvature points (gear teeth, spikes)
+                var maxOut = 40;
+                var outP = [];
+                if (pts.length <= maxOut) {
+                    for (var i = 0; i < pts.length; i++) outP.push([Math.round((pts[i].x * sc + ox) / 12), Math.round((pts[i].y * sc + oy) / 12)]);
+                } else {
+                    // Score each point by curvature; always keep first/last
+                    var scored = [];
+                    for (var i = 0; i < pts.length; i++) scored.push({ idx: i, c: curvatures[i] || 0 });
+                    // Always include evenly spaced base points
+                    var keep = {};
+                    var baseCount = Math.floor(maxOut * 0.5);
+                    for (var i = 0; i < baseCount; i++) keep[Math.floor(i * (pts.length - 1) / (baseCount - 1))] = true;
+                    // Fill remaining slots with highest curvature points
+                    scored.sort(function(a, b) { return b.c - a.c });
+                    var remaining = maxOut - Object.keys(keep).length;
+                    for (var i = 0; i < scored.length && remaining > 0; i++) {
+                        if (!keep[scored[i].idx]) { keep[scored[i].idx] = true; remaining-- }
+                    }
+                    var indices = Object.keys(keep).map(Number).sort(function(a,b){return a-b});
+                    for (var i = 0; i < indices.length; i++) {
+                        var pi = indices[i];
+                        outP.push([Math.round((pts[pi].x * sc + ox) / 12), Math.round((pts[pi].y * sc + oy) / 12)]);
+                    }
+                }
+                // Remove duplicate consecutive points
+                var cleanP = [outP[0]];
+                for (var i = 1; i < outP.length; i++) {
+                    if (outP[i][0] !== cleanP[cleanP.length-1][0] || outP[i][1] !== cleanP[cleanP.length-1][1]) cleanP.push(outP[i]);
+                }
+                outP = cleanP;
                 var area = 0; for (var i = 0; i < outP.length; i++) { var j2 = (i + 1) % outP.length; area += outP[i][0] * outP[j2][1] - outP[j2][0] * outP[i][1] } area = Math.abs(area) / 2;
                 if (isScotty) return { a: area, c: 20, s: 1.0, l: 5, p: outP, n: 'Scotty' };
                 return { a: area, c: corners, s: sym, l: legs, p: outP, n: (document.getElementById('mname').value || '???').slice(0, 12) }
@@ -284,9 +344,23 @@
                 ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++)ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fill();
                 var name = document.getElementById('mname').value || '';
                 if (name) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, W / 2, 20) }
+                // Update stats panel
+                var sp = document.getElementById('statsPanel'); sp.style.display = 'block';
+                document.getElementById('statArea').textContent = stats.a + ' → ' + Math.min(150, Math.max(80, Math.round(stats.a * 0.6))) + ' HP';
+                document.getElementById('statCorners').textContent = stats.c + ' → ' + Math.min(stats.c, 5) + ' spikes';
+                document.getElementById('statSym').textContent = (Math.round(stats.s * 100)) + '%';
+                document.getElementById('statLegs').textContent = stats.l + ' → ' + (1.0 + Math.min(stats.l * 0.15, 0.5)).toFixed(2) + 'x speed';
+                var ab = 'none';
+                if (stats.c <= 1 && stats.s > 0.7) ab = 'absorb';
+                else if (stats.l >= 3) ab = 'dash';
+                else if (stats.c >= 4) ab = 'block';
+                var abIcons = { dash: '⚡ Dash', block: '🛡 Block', absorb: '💚 Absorb', none: '❌ None' };
+                var abDescs = { dash: 'Speed burst (3+ legs detected)', block: 'Invincible 4s (4+ corners detected)', absorb: 'Reflect damage & heal 2s (≤1 corner + >70% symmetry)', none: 'No special ability' };
+                document.getElementById('statAbility').textContent = abIcons[ab] || 'None';
+                document.getElementById('statAbilityRule').textContent = abDescs[ab];
                 return stats
             }
-            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 4s', absorb: 'Heal 75% on hit', none: '' };
+            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 4s', absorb: 'Reflect dmg 2s', none: '' };
             var abilityIcons = { dash: '⚡', block: '🛡', absorb: '💚', none: '' };
             var puLabels = { speed: '2x SPEED', shield: 'SHIELD', damage: '2x DMG', ghost: 'PHASE' };
             function renderArena() {
@@ -494,7 +568,24 @@
             function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
             function getXY(e) { var r = c.getBoundingClientRect(), sx = W / r.width, sy = H / r.height; var px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left, py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return { x: clamp(px * sx, 5, W - 5), y: clamp(py * sy, 5, H - 5) } }
             function onDown(e) { if (isReady) return; isScotty = false; var p = getXY(e); path = [p] }
-            function smooth(p) { for (var k = 0; k < 2; k++) { var n = []; for (var i = 0; i < p.length; i++) { var a = p[i - 1] || p[0], b = p[i], cc = p[i + 1] || p[p.length - 1]; n.push({ x: (a.x + b.x * 2 + cc.x) / 4, y: (a.y + b.y * 2 + cc.y) / 4 }) } p = n } return p }
+            function smooth(p) {
+                // Adaptive smoothing: preserve sharp corners (gear teeth, spikes)
+                for (var k = 0; k < 2; k++) {
+                    var n = [];
+                    for (var i = 0; i < p.length; i++) {
+                        var a = p[i - 1] || p[0], b = p[i], cc = p[i + 1] || p[p.length - 1];
+                        // Measure angle change at this point
+                        var ang1 = Math.atan2(b.y - a.y, b.x - a.x);
+                        var ang2 = Math.atan2(cc.y - b.y, cc.x - b.x);
+                        var angDiff = Math.abs(ang1 - ang2); if (angDiff > Math.PI) angDiff = 2 * Math.PI - angDiff;
+                        // Sharp corner (>45 deg): reduce smoothing to preserve detail
+                        var weight = angDiff > 0.8 ? 6 : 2;
+                        n.push({ x: (a.x + b.x * weight + cc.x) / (weight + 2), y: (a.y + b.y * weight + cc.y) / (weight + 2) });
+                    }
+                    p = n;
+                }
+                return p;
+            }
             function onMove(e) {
                 if (path.length === 0 || isReady) return; var p = getXY(e); path.push(p); var draw = smooth(path.slice()); var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = myColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(draw[0].x, draw[0].y); for (var i = 1; i < draw.length; i++)ctx.lineTo(draw[i].x, draw[i].y); ctx.stroke();
                 if (draw.length > 5) { var d = Math.hypot(draw[0].x - draw[draw.length - 1].x, draw[0].y - draw[draw.length - 1].y); ctx.strokeStyle = d < 50 ? 'rgba(46,204,113,0.5)' : 'rgba(231,76,60,0.3)'; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(draw[draw.length - 1].x, draw[draw.length - 1].y); ctx.lineTo(draw[0].x, draw[0].y); ctx.stroke(); ctx.setLineDash([]) }
