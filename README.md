@@ -1,10 +1,19 @@
 # Shadow Puppet Arena
 
-Draw a shape silhouette. Up to 6 players battle in a real-time arena! Shape affects behavior: **spiky = pushes others**, **round = stable**, **legs = speed**.
+Draw a shape silhouette. Battle AI opponents in a real-time arena! Shape geometry determines your stats: **spiky = damage**, **round = tanky**, **long limbs = speed**.
 
-**Play now:** [https://shadow-puppet-arena.onrender.com/](https://shadow-puppet-arena.onrender.com/) *(first load may take ~30 sec on free tier)*
+**Play online (multiplayer):** [https://shadow-puppet-arena.onrender.com/](https://shadow-puppet-arena.onrender.com/) *(first load may take ~30 sec on free tier)*
 
-## Multiplayer
+## How to Play
+
+### Offline (vs AI)
+
+1. Pick a mode: **1 vs 1**, **1 vs 3**, or **1 vs 5**
+2. **Draw** a shape in one stroke (it auto-closes) — or click **Load Scotty** for a preset Scottish Terrier shape
+3. Click **Fight!** to enter the arena
+4. Move with **WASD / Arrow Keys**, press **Space** to Blast, **E / Shift** for your Ability
+
+### Multiplayer
 
 1. **Create game:** Click "Create Game" → share the QR code or 4-letter code
 2. **Join:** Scan QR or enter code (or open the join URL directly)
@@ -17,50 +26,82 @@ Draw a shape silhouette. Up to 6 players battle in a real-time arena! Shape affe
 
 | Draw This | Stat | Effect in Battle |
 |-----------|------|------------------|
-| **Large, filled shape** | HP | More health (60-150) |
-| **Sharp, jagged edges** | Spikes | Deal more collision damage |
-| **Round, symmetrical** | Stability | Take less damage, resist knockback |
-| **Long protrusions** | Speed | Move faster across arena |
+| **Sharp, jagged edges** | Spikes (max 5) | Deal more collision damage |
+| **Round, symmetrical** | Stability (max 2) | Take less damage, resist knockback |
+| **Round, symmetrical** | HP (80–150) | More health from higher symmetry |
+| **Long protrusions** | Speed (1.0–1.5) | Move faster across arena |
 
 ### Special Abilities
 
-Shapes unlock unique abilities based on their geometry:
+Shapes unlock a unique ability based on their geometry:
 
 | Shape Type | Ability | Effect |
 |------------|---------|--------|
-| **Star** (5+ corners) | **Spike Burst** | 20 AoE damage to nearby enemies |
-| **Circle** (Round) | **Absorb** | Passive: Heal for 50% of damage dealt |
-| **Snake** (Long/Legs) | **Dash** | Burst of extreme speed (3s) |
-| **Square** (4 corners) | **Block** | Turn invincible for 3s |
+| **Star** (5+ corners) | **Spike Burst** | 20 AoE damage to all enemies within range |
+| **Circle** (≤1 corner, high symmetry) | **Absorb** | Passive: Heal for 50% of damage dealt on collision |
+| **Snake** (3+ long segments) | **Dash** | 3s speed burst + instant velocity boost |
+| **Square** (exactly 4 corners) | **Block** | 3s invincibility shield |
 
-### Power-Ups & Hazards
+Abilities have a **10-second cooldown** (shown on the button).
 
-Collect power-ups to gain an advantage:
+### Combat & Physics
 
-- ⚡ **Speed Boost** (Yellow): 2x movement speed for 5s
-- 🛡️ **Shield** (Blue): Immune to all damage for 3s
-- 💥 **Damage Boost** (Red): 2x spike damage for 5s
-- 👻 **Ghost** (White): Pass through enemies for 4s
+- **Collision damage** = (attacker's spikes − defender's stability) × 3, multiplied by velocity factor
+- **Velocity bonus** = damage scales with speed — faster hits deal more damage (yellow damage numbers)
+- **Damage boost** power-up doubles spike damage; **Shield** negates all damage
+- **Ghost** effect lets you pass through enemies (no collision)
+- **Knockback** on collision based on combined spike/stability difference
+- **I-frames:** 20 ticks of invulnerability after each hit to prevent instant kills
+- **Low-HP speed boost:** Shapes move faster as they lose health (up to 3× at critical HP)
+- **Shrinking size:** Shapes visually shrink as HP drops
 
-Watch out for hazards appearing later in the match:
+### Power-Ups
 
-- � **Fire Zones**: Deal damage over time
-- 🌀 **Vortexes**: Pull shapes towards the center
-- ⚡ **Lightning**: Strikes random spots for massive damage
+Collect colored orbs to gain a temporary buff:
 
-### Combat System
+| Power-Up | Color | Duration | Effect |
+|----------|-------|----------|--------|
+| ⚡ Speed | Yellow | 5s | 2× movement speed |
+| 🛡️ Shield | Blue | 3s | Immune to all damage |
+| 💥 Damage | Red | 5s | 2× spike damage on collision |
+| 👻 Ghost | Gray | 4s | Pass through enemies, no collision |
 
-- **Collision damage** = attacker's spikes − defender's stability
-- **Velocity Bonus** = significant damage boost when hitting at high speed (💨)
-- **Team Mode** = automatic 2v2 or 3v3 teams (Red vs Blue) with no friendly fire
-- **Sudden Death** = arena border turns red, continuous damage until one remains!
+### Hazards
+
+Appear later in the match as the battle intensifies:
+
+| Hazard | Effect |
+|--------|--------|
+| 🔥 **Fire Zones** | 3 damage per tick to shapes inside (radius 50) |
+| 🌀 **Vortexes** | Pull shapes toward the center (radius 100) |
+| ⚡ **Lightning** | Warning circle appears, then strikes for 25 damage after 1 second |
+
+### Arena Events
+
+- **Health Packs** (green ✚) spawn periodically — heal 20–50 HP on pickup
+- **Arena Shrinks** every ~10 seconds — border turns red, out-of-bounds area is deadly
+- **Sudden Death** triggers when the arena is very small — all unshielded shapes take 2 damage/second
+- **Blast** (Space / button) — pushes all nearby enemies away with a shockwave (10s cooldown)
+
+### Controls
+
+| Action | Keyboard | Button |
+|--------|----------|--------|
+| Move | WASD / Arrow Keys | — |
+| Blast | Space | Blast |
+| Ability | E / Shift | Ability |
+
+### Load Scotty
+
+Click the **Load Scotty** button on the draw screen to load a pre-made Scottish Terrier silhouette with boosted stats (max spikes, speed, and symmetry). It's an overpowered preset for fun!
 
 ### Tips
 
-- Draw a **star** for offense or a **circle** for tankiness
-- Use **Blast** to push enemies into the shrinking border
-- **Charge** at enemies for bonus velocity damage!
-- Work with your team to corner opponents
+- Draw a **star** for offense (Spike Burst) or a **circle** for tankiness (Absorb)
+- Use **Blast** to push enemies into the shrinking border for sudden death damage
+- **Charge** at enemies at full speed for bonus velocity damage
+- Pick up **Ghost** to safely reposition, then ambush when it wears off
+- Low on health? Your speed boost kicks in — use it to kite and grab health packs
 
 ## Deploy to Render
 
@@ -80,33 +121,34 @@ This repository includes a standalone, offline-compatible version of the game de
 
 ### How to Compress & Verify
 
-**Compress** the offline HTML into a `.tar.gz` archive:
+**One-step** (compress + verify) using the helper script:
 
 ```powershell
-# Windows (PowerShell)
+# Windows (PowerShell) — compresses then serves on port 8080
+./compress-and-verify.ps1 offline.html
+```
+
+**Manual steps** if you prefer:
+
+```powershell
+# Windows (PowerShell): Compress
 New-Item -ItemType Directory -Path "index_temp" -Force | Out-Null
 Copy-Item "offline.html" "index_temp\index.html" -Force
 tar -czf "offline.tar.gz" -C "index_temp" "index.html"
 Remove-Item -Recurse -Force "index_temp"
-```
 
-```bash
-# Linux / macOS
-mkdir -p index_temp
-cp offline.html index_temp/index.html
-tar -czf offline.tar.gz -C index_temp index.html
-rm -rf index_temp
-```
-
-**Verify** by extracting and serving locally:
-
-```powershell
-# Windows (PowerShell) — serves on port 8080
+# Verify — serves on port 8080
 ./verify.ps1 offline.tar.gz
 ```
 
 ```bash
-# Linux / macOS — serves on port 8000
+# Linux / macOS: Compress
+mkdir -p index_temp
+cp offline.html index_temp/index.html
+tar -czf offline.tar.gz -C index_temp index.html
+rm -rf index_temp
+
+# Verify — serves on port 8000
 ./verify.sh offline.tar.gz
 ```
 
