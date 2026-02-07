@@ -19,13 +19,43 @@ function spawnPack(r) {
   r.packs.push({ x: x, y: y, hp: heal });
 }
 
+// Power-up types: 0=speed, 1=shield, 2=damage, 3=ghost
+const POWERUP_TYPES = ['speed', 'shield', 'damage', 'ghost'];
+const POWERUP_DURATION = { speed: 300, shield: 180, damage: 300, ghost: 240 }; // ticks (16ms each)
+function spawnPowerup(r) {
+  var margin = 40;
+  var x = r.arenaL + margin + Math.random() * (r.arenaR - r.arenaL - margin * 2);
+  var y = r.arenaT + margin + Math.random() * (r.arenaB - r.arenaT - margin * 2);
+  var type = POWERUP_TYPES[Math.floor(Math.random() * 4)];
+  r.powerups.push({ x: x, y: y, type: type });
+}
+
+// Hazard spawning
+function spawnHazard(r) {
+  var type = Math.random() < 0.5 ? 'fire' : 'vortex';
+  var x = r.arenaL + 50 + Math.random() * (r.arenaR - r.arenaL - 100);
+  var y = r.arenaT + 50 + Math.random() * (r.arenaB - r.arenaT - 100);
+  r.hazards.push({ x: x, y: y, type: type, age: 0, duration: type === 'fire' ? 375 : 500 });
+}
+
 const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
+
+// Detect shape ability based on stats
+function detectAbility(m) {
+  if (m.c >= 5) return 'spikeBurst'; // Star shape - AoE damage
+  if (m.c <= 1 && m.s > 0.7) return 'absorb'; // Circle - heal on hit
+  if (m.l >= 3) return 'dash'; // Snake/tentacles - speed burst
+  if (m.c === 4) return 'block'; // Square - temp invincibility
+  return 'none';
+}
+
 function startArena(roomCode) {
   const r = rooms[roomCode];
   if (!r || r.started) return;
   r.started = true;
   r.monsters = {}; r.tick = 0; r.arenaL = 0; r.arenaT = 0; r.arenaR = ARENA_W; r.arenaB = ARENA_H;
-  r.packs = []; r.blasts = [];
+  r.packs = []; r.blasts = []; r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = [];
+  r.suddenDeath = false;
   for (const pid of Object.keys(r.monsterData)) {
     const m = r.monsterData[pid];
     const hp = Math.min(MAX_HP, Math.max(60, Math.floor(m.a / 25)));
@@ -35,13 +65,18 @@ function startArena(roomCode) {
     const cx = ARENA_W / 2, cy = ARENA_H / 2;
     const dx = cx - px, dy = cy - py;
     const dist = Math.hypot(dx, dy) || 1;
+    const ability = detectAbility(m);
     r.monsters[pid] = {
       x: px, y: py,
       vx: (dx / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       vy: (dy / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       path: m.p, name: m.n || '???', baseSize: BASE_SIZE, size: BASE_SIZE, hp: hp, maxHp: hp, iframes: 0,
       spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
-      color: r.colors[pid] || '#9b59b6'
+      color: r.colors[pid] || '#9b59b6',
+      // New properties
+      ability: ability, abilityCooldown: 0,
+      effects: {}, // { speed: ticksLeft, shield: ticksLeft, etc }
+      kills: 0, trail: []
     };
     r.monsters[pid].speed = Math.max(MIN_SPEED, r.monsters[pid].baseSpeed);
   }
@@ -128,6 +163,85 @@ function tick(roomCode) {
   var phase = Math.floor(r.tick / 625);
   var packRate = (aliveCount <= 2 ? 450 : aliveCount <= 3 ? 750 : 1200) + phase * 100;
   if (r.tick % packRate === 0 && r.packs.length < 2) spawnPack(r);
+
+  // Spawn power-ups every ~12 seconds
+  if (r.tick % 750 === 0 && r.powerups.length < 2) spawnPowerup(r);
+
+  // Spawn hazards after 30 seconds, more frequent as game goes on
+  if (r.tick > 1875 && r.tick % (1000 - Math.min(phase * 100, 500)) === 0 && r.hazards.length < 3) spawnHazard(r);
+
+  // Remove powerups/hazards outside arena bounds
+  for (let i = r.powerups.length - 1; i >= 0; i--) {
+    const p = r.powerups[i];
+    if (p.x < r.arenaL || p.x > r.arenaR || p.y < r.arenaT || p.y > r.arenaB) r.powerups.splice(i, 1);
+  }
+
+  // Process hazards
+  for (let hi = r.hazards.length - 1; hi >= 0; hi--) {
+    const h = r.hazards[hi];
+    h.age++;
+    if (h.age > h.duration) { r.hazards.splice(hi, 1); continue; }
+    // Apply hazard effects to monsters
+    for (const id of Object.keys(r.monsters)) {
+      const m = r.monsters[id];
+      const dist = Math.hypot(m.x - h.x, m.y - h.y);
+      if (h.type === 'fire' && dist < 50) {
+        if (r.tick % 30 === 0 && !m.effects.shield) { m.hp -= 3; r.floatTexts.push({ x: m.x, y: m.y - 20, text: '-3', color: '#f00' }); }
+      }
+      if (h.type === 'vortex' && dist < 100 && dist > 10) {
+        const pull = 0.15 * (1 - dist / 100);
+        m.vx += (h.x - m.x) / dist * pull;
+        m.vy += (h.y - m.y) / dist * pull;
+      }
+    }
+  }
+
+  // Lightning strike warning + strike
+  if (r.tick > 2500 && r.tick % 625 === 500) {
+    // Warning
+    const x = r.arenaL + 50 + Math.random() * (r.arenaR - r.arenaL - 100);
+    const y = r.arenaT + 50 + Math.random() * (r.arenaB - r.arenaT - 100);
+    r.lightningWarning = { x, y, tick: r.tick };
+  }
+  if (r.lightningWarning && r.tick - r.lightningWarning.tick === 60) {
+    const lw = r.lightningWarning;
+    for (const id of Object.keys(r.monsters)) {
+      const m = r.monsters[id];
+      if (Math.hypot(m.x - lw.x, m.y - lw.y) < 60 && !m.effects.shield) {
+        m.hp -= 25;
+        r.floatTexts.push({ x: m.x, y: m.y - 30, text: '-25⚡', color: '#ff0' });
+        logs.push(m.name + ' struck by lightning!');
+      }
+    }
+    r.lightningStrike = { x: lw.x, y: lw.y };
+    r.lightningWarning = null;
+  }
+  if (r.lightningStrike && r.tick % 10 === 0) r.lightningStrike = null;
+
+  // Sudden death - when arena is minimum size
+  if ((r.arenaR - r.arenaL) <= 200 && (r.arenaB - r.arenaT) <= 150 && !r.suddenDeath) {
+    r.suddenDeath = true;
+    logs.push('⚠️ SUDDEN DEATH!');
+  }
+  if (r.suddenDeath && r.tick % 60 === 0) {
+    for (const id of Object.keys(r.monsters)) {
+      const m = r.monsters[id];
+      if (!m.effects.shield) { m.hp -= 2; r.floatTexts.push({ x: m.x, y: m.y - 15, text: '-2', color: '#a00' }); }
+    }
+  }
+
+  // Process monster effects (countdown timers)
+  for (const id of Object.keys(r.monsters)) {
+    const m = r.monsters[id];
+    for (const eff of Object.keys(m.effects)) {
+      m.effects[eff]--;
+      if (m.effects[eff] <= 0) delete m.effects[eff];
+    }
+    if (m.abilityCooldown > 0) m.abilityCooldown--;
+    // Trail for visual effect
+    m.trail.push({ x: m.x, y: m.y });
+    if (m.trail.length > 8) m.trail.shift();
+  }
   // Process new blasts -> convert to active blast accelerations
   var blastFx = [];
   if (r.blasts && r.blasts.length) {
@@ -160,7 +274,10 @@ function tick(roomCode) {
   for (const id of Object.keys(r.monsters)) {
     const m = r.monsters[id];
     m.size = Math.max(8, m.baseSize * (m.hp / m.maxHp));
-    m.speed = Math.max(MIN_SPEED, m.baseSpeed * (1 + (1 - m.hp / m.maxHp) * 2));
+    // Apply speed boost effect
+    let speedMult = 1 + (1 - m.hp / m.maxHp) * 2;
+    if (m.effects.speed) speedMult *= 2;
+    m.speed = Math.max(MIN_SPEED, m.baseSpeed * speedMult);
     m.hp = Math.min(m.hp, m.maxHp);
     // Ensure minimum velocity magnitude
     const curV = Math.hypot(m.vx, m.vy);
@@ -180,8 +297,19 @@ function tick(roomCode) {
       // Check if health pack center is inside monster polygon
       if (ptInPoly(pk.x, pk.y, v)) {
         m.hp = Math.min(m.maxHp, m.hp + pk.hp);
+        r.floatTexts.push({ x: pk.x, y: pk.y, text: '+' + pk.hp, color: '#2f2' });
         logs.push(m.name + ' +' + pk.hp + 'hp!');
         r.packs.splice(pi, 1);
+      }
+    }
+    // Power-up pickup
+    for (let pi = r.powerups.length - 1; pi >= 0; pi--) {
+      const pu = r.powerups[pi];
+      if (ptInPoly(pu.x, pu.y, v)) {
+        m.effects[pu.type] = POWERUP_DURATION[pu.type];
+        r.floatTexts.push({ x: pu.x, y: pu.y, text: pu.type.toUpperCase(), color: '#ff0' });
+        logs.push(m.name + ' got ' + pu.type + '!');
+        r.powerups.splice(pi, 1);
       }
     }
   }
@@ -191,6 +319,8 @@ function tick(roomCode) {
     for (let j = i + 1; j < ids.length; j++) {
       const a = r.monsters[ids[i]], b = r.monsters[ids[j]];
       if (!a || !b) continue;
+      // Ghost effect: pass through
+      if (a.effects.ghost || b.effects.ghost) continue;
       if (!polyOverlap(a, b)) continue;
       const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy) || 0.1;
       const nx = dx / dist, ny = dy / dist;
@@ -201,17 +331,29 @@ function tick(roomCode) {
       const sep = (a.size + b.size) * 0.1;
       a.x -= nx * sep; a.y -= ny * sep; b.x += nx * sep; b.y += ny * sep;
       clampBounds(a, r); clampBounds(b, r);
-      // Damage only if no iframes
+      // Damage only if no iframes, check shield
       if (a.iframes <= 0 && b.iframes <= 0) {
-        const dmgA = Math.min(15, Math.max(1, Math.round((b.spikes - a.stability) * 3)));
-        const dmgB = Math.min(15, Math.max(1, Math.round((a.spikes - b.stability) * 3)));
+        const dmgA = a.effects.shield ? 0 : Math.min(15, Math.max(1, Math.round((b.spikes - a.stability) * 3 * (b.effects.damage ? 2 : 1))));
+        const dmgB = b.effects.shield ? 0 : Math.min(15, Math.max(1, Math.round((a.spikes - b.stability) * 3 * (a.effects.damage ? 2 : 1))));
         a.hp -= dmgA; b.hp -= dmgB; a.iframes = 20; b.iframes = 20;
+        if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA, color: '#f55' });
+        if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB, color: '#f55' });
+        // Absorb ability: heal on hit
+        if (a.ability === 'absorb' && dmgB > 0) a.hp = Math.min(a.maxHp, a.hp + Math.floor(dmgB / 2));
+        if (b.ability === 'absorb' && dmgA > 0) b.hp = Math.min(b.maxHp, b.hp + Math.floor(dmgA / 2));
         logs.push(a.name + ' -' + dmgA + ' / ' + b.name + ' -' + dmgB);
       }
     }
   }
+  // Check deaths and track kills
   for (const id of Object.keys(r.monsters)) {
-    if (r.monsters[id].hp <= 0) { logs.push(r.monsters[id].name + ' defeated!'); delete r.monsters[id] }
+    if (r.monsters[id].hp <= 0) {
+      const dead = r.monsters[id];
+      logs.push(dead.name + ' defeated!');
+      r.floatTexts.push({ x: dead.x, y: dead.y, text: '💀', color: '#fff' });
+      r.kills.push({ name: dead.name, x: dead.x, y: dead.y });
+      delete r.monsters[id];
+    }
   }
   const alive = Object.keys(r.monsters);
   if (alive.length <= 1 && !r.done) {
@@ -222,13 +364,24 @@ function tick(roomCode) {
     setTimeout(() => {
       if (!r || !rooms[roomCode]) return;
       r.started = false; r.done = false; r.monsters = null; r.packs = []; r.blasts = [];
+      r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = []; r.suddenDeath = false;
       // Keep monsterData so shapes are preserved, but clear ready state
       const saved = {}; for (const pid of Object.keys(r.monsterData)) saved[pid] = r.monsterData[pid];
       r.monsterData = {}; r.savedShapes = saved;
       r.players.forEach(p => { if (p.readyState === 1) { p.send(JSON.stringify({ t: 'restart' })); p.send(JSON.stringify({ t: 'status', ready: 0, total: r.players.length })) } });
     }, 4000);
   }
-  const data = JSON.stringify({ t: 'arena', m: r.monsters, b: [r.arenaL, r.arenaT, r.arenaR, r.arenaB], pk: r.packs, bl: blastFx.length ? blastFx : undefined, log: logs.length ? logs : undefined });
+  // Clear float texts after sending (one-time display)
+  const floats = r.floatTexts.slice(); r.floatTexts = [];
+  const data = JSON.stringify({
+    t: 'arena', m: r.monsters, b: [r.arenaL, r.arenaT, r.arenaR, r.arenaB],
+    pk: r.packs, pu: r.powerups, hz: r.hazards,
+    bl: blastFx.length ? blastFx : undefined,
+    ft: floats.length ? floats : undefined,
+    lw: r.lightningWarning, ls: r.lightningStrike,
+    sd: r.suddenDeath,
+    log: logs.length ? logs : undefined
+  });
   r.players.forEach(p => { if (p.readyState === 1) p.send(data) });
 }
 wss.on('connection', ws => {
@@ -271,6 +424,37 @@ wss.on('connection', ws => {
           if (!r.blasts) r.blasts = [];
           const me = r.monsters[ws.id];
           r.blasts.push({ x: me.x, y: me.y, by: ws.id });
+        }
+      } else if (d.t === 'ability' && ws.room) {
+        const r = rooms[ws.room];
+        if (r && r.monsters && !r.done && r.monsters[ws.id]) {
+          const me = r.monsters[ws.id];
+          if (me.abilityCooldown > 0 || me.ability === 'none') return;
+          me.abilityCooldown = 600; // 10 second cooldown
+          if (me.ability === 'spikeBurst') {
+            // AoE damage pulse
+            for (const id of Object.keys(r.monsters)) {
+              if (id == ws.id) continue;
+              const other = r.monsters[id];
+              const dist = Math.hypot(other.x - me.x, other.y - me.y);
+              if (dist < 100 && !other.effects.shield) {
+                other.hp -= 20;
+                r.floatTexts.push({ x: other.x, y: other.y - 20, text: '-20💥', color: '#f00' });
+              }
+            }
+            r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'SPIKE BURST!', color: '#f80' });
+          } else if (me.ability === 'dash') {
+            // Speed burst
+            me.effects.speed = 180; // 3 second super speed
+            const vel = Math.hypot(me.vx, me.vy) || 1;
+            me.vx = me.vx / vel * 4; me.vy = me.vy / vel * 4;
+            r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'DASH!', color: '#0ff' });
+          } else if (me.ability === 'block') {
+            // Temp invincibility
+            me.effects.shield = 180; // 3 seconds
+            r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'BLOCK!', color: '#88f' });
+          }
+          // absorb is passive, handled in collision
         }
       }
     }

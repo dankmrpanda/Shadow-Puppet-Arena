@@ -162,14 +162,17 @@
             style=display:none;background:#2980b9>Load Previous</button><button id=clear>Clear</button><button
             id=done>Ready!</button><button id=unready style=display:none;background:#666>Unready</button>
     </div>
-    <div id=arena><canvas id=ac width=640 height=480></canvas><button id=blastBtn>Blast (ready)</button>
+    <div id=arena><canvas id=ac width=640 height=480></canvas>
+        <div style="margin:4px"><button id=blastBtn>Blast (ready)</button><button id=abilityBtn
+                style=background:#9b59b6>Ability</button></div>
         <div id=log></div>
     </div>
     <script>
         (function () {
-            var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev');
-            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], ws, isReady = false, bounds = [0, 0, 640, 480];
-            var blastCooldown = 0, blastFx = [], isDead = false, hasSavedShape = false, savedPath = [];
+            var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev'), abilityBtn = document.getElementById('abilityBtn');
+            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], ws, isReady = false, bounds = [0, 0, 640, 480];
+            var blastCooldown = 0, abilityCooldown = 0, blastFx = [], floatTexts = [], isDead = false, hasSavedShape = false, savedPath = [];
+            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none';
             var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + (location.host || 'localhost:3000');
             var retries = 0;
             function post(m) { msg.textContent = m; msg.style.color = '#888' }
@@ -186,8 +189,15 @@
                     else if (d.t === 'status') { count.textContent = d.ready + '/' + d.total + ' ready' }
                     else if (d.t === 'start') { lobby.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; playerId = d.id; if (d.color) myColor = d.color }
                     else if (d.t === 'arena') {
-                        monsters = d.m; packs = d.pk || []; if (d.b) bounds = d.b; if (d.bl) for (var bi = 0; bi < d.bl.length; bi++)blastFx.push({ x: d.bl[bi].x, y: d.bl[bi].y, age: 0 }); lobby.style.display = 'none'; ui.style.display = 'none'; arena.style.display = 'flex'; blastBtn.style.display = 'inline-block'; if (d.log) for (var i = 0; i < d.log.length; i++)addLog(d.log[i]);
-                        if (!monsters[playerId] && !isDead) { isDead = true; blastBtn.disabled = true; blastBtn.textContent = 'Dead'; blastBtn.style.background = '#333' }
+                        monsters = d.m; packs = d.pk || []; powerups = d.pu || []; hazards = d.hz || [];
+                        if (d.b) bounds = d.b;
+                        if (d.bl) for (var bi = 0; bi < d.bl.length; bi++) blastFx.push({ x: d.bl[bi].x, y: d.bl[bi].y, age: 0 });
+                        if (d.ft) for (var fi = 0; fi < d.ft.length; fi++) floatTexts.push({ x: d.ft[fi].x, y: d.ft[fi].y, text: d.ft[fi].text, color: d.ft[fi].color, age: 0 });
+                        lightningWarning = d.lw; lightningStrike = d.ls; suddenDeath = d.sd;
+                        lobby.style.display = 'none'; ui.style.display = 'none'; arena.style.display = 'flex'; blastBtn.style.display = 'inline-block';
+                        if (d.log) for (var i = 0; i < d.log.length; i++) addLog(d.log[i]);
+                        if (!monsters[playerId] && !isDead) { isDead = true; blastBtn.disabled = true; blastBtn.textContent = 'Dead'; blastBtn.style.background = '#333'; abilityBtn.disabled = true; }
+                        else if (monsters[playerId]) { myAbility = monsters[playerId].ability || 'none'; abilityBtn.textContent = myAbility === 'none' ? 'No Ability' : myAbility.charAt(0).toUpperCase() + myAbility.slice(1); }
                         renderArena()
                     }
                     else if (d.t === 'restart') { isDead = false; hasSavedShape = true; if (path.length > 3) savedPath = path.slice(); arena.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; isReady = false; done.style.display = 'inline-block'; unready.style.display = 'none'; blastBtn.disabled = false; blastBtn.style.background = '#c0392b'; blastBtn.textContent = 'Blast (ready)'; blastCooldown = 0; blastFx = []; if (savedPath.length > 3) { loadPrevBtn.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Load previous shape or draw new'; } else { document.getElementById('drawStatus').textContent = 'Draw your monster'; } document.getElementById('drawStatus').style.color = '#888'; if (path.length > 3) drawMonster() }
@@ -233,7 +243,31 @@
                 var ctx = ac.getContext('2d');
                 ctx.fillStyle = '#180818'; ctx.fillRect(0, 0, 640, 480);
                 ctx.fillStyle = '#0d0d12'; ctx.fillRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
-                ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.strokeRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+                ctx.strokeStyle = suddenDeath ? '#f00' : '#555'; ctx.lineWidth = suddenDeath ? 4 : 2; ctx.strokeRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+
+                // Draw hazards
+                for (var hi = 0; hi < hazards.length; hi++) {
+                    var hz = hazards[hi];
+                    if (hz.type === 'fire') {
+                        ctx.fillStyle = 'rgba(255,100,0,0.4)'; ctx.beginPath(); ctx.arc(hz.x, hz.y, 50, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#f80'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔥', hz.x, hz.y);
+                    } else if (hz.type === 'vortex') {
+                        ctx.strokeStyle = 'rgba(128,0,255,0.6)'; ctx.lineWidth = 3;
+                        for (var vi = 0; vi < 3; vi++) { ctx.beginPath(); ctx.arc(hz.x, hz.y, 30 + vi * 25, 0, Math.PI * 2); ctx.stroke(); }
+                        ctx.fillStyle = '#808'; ctx.font = '14px sans-serif'; ctx.fillText('🌀', hz.x, hz.y);
+                    }
+                }
+                // Lightning warning/strike
+                if (lightningWarning) {
+                    ctx.strokeStyle = 'rgba(255,255,0,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+                    ctx.beginPath(); ctx.arc(lightningWarning.x, lightningWarning.y, 60, 0, Math.PI * 2); ctx.stroke();
+                    ctx.setLineDash([]); ctx.fillStyle = '#ff0'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡', lightningWarning.x, lightningWarning.y);
+                }
+                if (lightningStrike) {
+                    ctx.fillStyle = 'rgba(255,255,200,0.8)'; ctx.beginPath(); ctx.arc(lightningStrike.x, lightningStrike.y, 60, 0, Math.PI * 2); ctx.fill();
+                }
+
+                // Health packs
                 for (var pi = 0; pi < packs.length; pi++) {
                     var pk = packs[pi];
                     ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(pk.x, pk.y, 10, 0, Math.PI * 2); ctx.fill();
@@ -241,21 +275,39 @@
                     ctx.fillRect(pk.x - 6, pk.y - 2, 12, 4); ctx.fillRect(pk.x - 2, pk.y - 6, 4, 12);
                     ctx.fillStyle = '#155d32'; ctx.font = 'bold 9px sans-serif'; ctx.fillText(pk.hp, pk.x, pk.y + 16);
                 }
+                // Power-ups
+                var puColors = { speed: '#ff0', shield: '#08f', damage: '#f00', ghost: '#aaa' };
+                var puSymbols = { speed: '⚡', shield: '🛡', damage: '💥', ghost: '👻' };
+                for (var pi = 0; pi < powerups.length; pi++) {
+                    var pu = powerups[pi];
+                    ctx.fillStyle = puColors[pu.type] || '#fff'; ctx.beginPath(); ctx.arc(pu.x, pu.y, 12, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#000'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(puSymbols[pu.type] || '?', pu.x, pu.y);
+                }
+                // Monsters
                 for (var id in monsters) {
                     var m = monsters[id];
                     if (!m.path || !m.path.length) continue;
                     var sc = m.size / 40;
                     var pcx = 0, pcy = 0; for (var i = 0; i < m.path.length; i++) { pcx += m.path[i][0] * 12; pcy += m.path[i][1] * 12 } pcx /= m.path.length; pcy /= m.path.length;
+                    // Effect glow
+                    if (m.effects && (m.effects.speed || m.effects.shield || m.effects.damage || m.effects.ghost)) {
+                        ctx.save(); ctx.globalAlpha = 0.4;
+                        ctx.fillStyle = m.effects.shield ? '#08f' : m.effects.speed ? '#ff0' : m.effects.damage ? '#f00' : '#aaa';
+                        ctx.beginPath(); ctx.arc(m.x, m.y, m.size + 10, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                    }
                     ctx.save(); ctx.translate(m.x, m.y); ctx.scale(sc, sc);
-                    ctx.fillStyle = m.color; ctx.beginPath();
+                    ctx.fillStyle = m.effects && m.effects.ghost ? 'rgba(255,255,255,0.3)' : m.color; ctx.beginPath();
                     ctx.moveTo((m.path[0][0] * 12 - pcx), (m.path[0][1] * 12 - pcy));
-                    for (var i = 1; i < m.path.length; i++)ctx.lineTo((m.path[i][0] * 12 - pcx), (m.path[i][1] * 12 - pcy));
+                    for (var i = 1; i < m.path.length; i++) ctx.lineTo((m.path[i][0] * 12 - pcx), (m.path[i][1] * 12 - pcy));
                     ctx.closePath(); ctx.fill('evenodd');
                     ctx.restore();
                     ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(10, Math.round(12 * sc)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText(Math.ceil(m.hp), m.x, m.y);
                     if (m.name) { ctx.font = Math.max(9, Math.round(10 * sc)) + 'px sans-serif'; ctx.fillText(m.name, m.x, m.y - m.size * 1.5 - 6) }
                 }
+                // Blast effects
                 for (var bi = blastFx.length - 1; bi >= 0; bi--) {
                     var bf = blastFx[bi]; bf.age++;
                     var r = bf.age * 4; var alpha = Math.max(0, 1 - bf.age / 20);
@@ -263,6 +315,15 @@
                     ctx.beginPath(); ctx.arc(bf.x, bf.y, r, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = 'rgba(255,255,255,' + (alpha * 0.5) + ')'; ctx.beginPath(); ctx.arc(bf.x, bf.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
                     if (bf.age > 20) blastFx.splice(bi, 1);
+                }
+                // Float texts
+                for (var fi = floatTexts.length - 1; fi >= 0; fi--) {
+                    var ft = floatTexts[fi]; ft.age++;
+                    ctx.globalAlpha = Math.max(0, 1 - ft.age / 40);
+                    ctx.fillStyle = ft.color; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText(ft.text, ft.x, ft.y - ft.age * 0.8);
+                    ctx.globalAlpha = 1;
+                    if (ft.age > 40) floatTexts.splice(fi, 1);
                 }
             }
             done.onclick = function () {
@@ -313,6 +374,12 @@
                 ws.send(JSON.stringify({ t: 'blast' }));
                 blastCooldown = 10; blastBtn.disabled = true; blastBtn.textContent = 'Blast (10s)';
                 var cd = setInterval(function () { blastCooldown--; if (blastCooldown <= 0) { clearInterval(cd); if (!isDead) { blastBtn.disabled = false; blastBtn.textContent = 'Blast (ready)'; blastBtn.style.background = '#c0392b' } } else { blastBtn.textContent = 'Blast (' + blastCooldown + 's)' } }, 1000)
+            };
+            abilityBtn.onclick = function () {
+                if (abilityCooldown > 0 || isDead || myAbility === 'none') return;
+                ws.send(JSON.stringify({ t: 'ability' }));
+                abilityCooldown = 10; abilityBtn.disabled = true; abilityBtn.textContent = myAbility + ' (10s)';
+                var cd = setInterval(function () { abilityCooldown--; if (abilityCooldown <= 0) { clearInterval(cd); if (!isDead) { abilityBtn.disabled = false; abilityBtn.textContent = myAbility.charAt(0).toUpperCase() + myAbility.slice(1); abilityBtn.style.background = '#9b59b6' } } else { abilityBtn.textContent = myAbility + ' (' + abilityCooldown + 's)' } }, 1000)
             };
             setInterval(function () { if (arena.style.display === 'flex' && Object.keys(monsters).length) renderArena() }, 16);
             connect();
