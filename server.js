@@ -15,7 +15,7 @@ function spawnPack(r){
   var margin=30;
   var x=r.arenaL+margin+Math.random()*(r.arenaR-r.arenaL-margin*2);
   var y=r.arenaT+margin+Math.random()*(r.arenaB-r.arenaT-margin*2);
-  var heal=Math.floor(50+Math.random()*76);
+  var heal=Math.floor(20+Math.random()*31);
   r.packs.push({x:x,y:y,hp:heal});
 }
 
@@ -97,14 +97,16 @@ function tick(roomCode){
   // Spawn health pack every 15s (935 ticks), max 3 on field
   if(r.tick%935===0&&r.packs.length<3)spawnPack(r);
   // Process blasts
+  var blastFx=[];
   if(r.blasts&&r.blasts.length){
     for(const bl of r.blasts){
+      blastFx.push({x:bl.x,y:bl.y});
       for(const id of Object.keys(r.monsters)){
         const m=r.monsters[id];
         const dx=m.x-bl.x,dy=m.y-bl.y;
         const dist=Math.hypot(dx,dy)||1;
-        if(dist<120){
-          const force=Math.max(0.4,(120-dist)/30);
+        if(dist<150){
+          const force=Math.max(2,(150-dist)/5);
           m.vx+=dx/dist*force;m.vy+=dy/dist*force;
         }
       }
@@ -131,7 +133,7 @@ function tick(roomCode){
     const m=r.monsters[id];
     for(let pi=r.packs.length-1;pi>=0;pi--){
       const pk=r.packs[pi];
-      if(Math.hypot(m.x-pk.x,m.y-pk.y)<m.size+10){
+      if(Math.hypot(m.x-pk.x,m.y-pk.y)<m.size+25){
         m.hp=Math.min(m.maxHp,m.hp+pk.hp);
         logs.push(m.name+' +'+pk.hp+'hp!');
         r.packs.splice(pi,1);
@@ -163,12 +165,21 @@ function tick(roomCode){
     if(r.monsters[id].hp<=0){logs.push(r.monsters[id].name+' defeated!');delete r.monsters[id]}
   }
   const alive=Object.keys(r.monsters);
-  if(alive.length<=1){
+  if(alive.length<=1&&!r.done){
     if(alive.length===1)logs.push(r.monsters[alive[0]].name+' wins!');
     else if(alive.length===0)logs.push('Draw!');
     r.done=true;
+    // Schedule restart after 4 seconds
+    setTimeout(()=>{
+      if(!r||!rooms[roomCode])return;
+      r.started=false;r.done=false;r.monsters=null;r.packs=[];r.blasts=[];
+      // Keep monsterData so shapes are preserved, but clear ready state
+      const saved={};for(const pid of Object.keys(r.monsterData))saved[pid]=r.monsterData[pid];
+      r.monsterData={};r.savedShapes=saved;
+      r.players.forEach(p=>{if(p.readyState===1)p.send(JSON.stringify({t:'restart'}))});
+    },4000);
   }
-  const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],pk:r.packs,log:logs.length?logs:undefined});
+  const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],pk:r.packs,bl:blastFx.length?blastFx:undefined,log:logs.length?logs:undefined});
   r.players.forEach(p=>{if(p.readyState===1)p.send(data)});
 }
 wss.on('connection',ws=>{
@@ -191,9 +202,11 @@ wss.on('connection',ws=>{
       r.players.push(ws);
       ws.send(JSON.stringify({t:'start',id:ws.id,color:r.colors[ws.id]}));
       r.players.forEach(p=>p.send(JSON.stringify({t:'joined',count:r.players.length})));
-    }else if(d.t==='monster'&&ws.room&&d.m){
+    }else if(d.t==='monster'&&ws.room){
       const r=rooms[ws.room];
-      r.monsterData[ws.id]=d.m;
+      if(d.m)r.monsterData[ws.id]=d.m;
+      else if(d.reuse&&r.savedShapes&&r.savedShapes[ws.id])r.monsterData[ws.id]=r.savedShapes[ws.id];
+      else return;
       const ready=Object.keys(r.monsterData).length;
       r.players.forEach(p=>p.send(JSON.stringify({t:'status',ready:ready,total:r.players.length})));
       if(ready>=2&&ready===r.players.length)startArena(ws.room);
