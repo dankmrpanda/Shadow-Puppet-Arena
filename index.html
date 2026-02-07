@@ -48,6 +48,7 @@ for(var i=ghosts.length-1;i>=0;i--){
 var g=ghosts[i];g.y+=g.speed;drawGhost(g);
 if(g.y>H-40){ghosts.splice(i,1);lives--;if(lives<=0){s.textContent='Game Over! Tap to restart';return}}}
 if(ghosts.length<2+wave)addGhost();
+if(path.length>1){x.strokeStyle='rgba(255,200,100,.9)';x.lineWidth=6;x.lineCap='round';x.beginPath();x.moveTo(path[0].x,path[0].y);for(var i=1;i<path.length;i++)x.lineTo(path[i].x,path[i].y);x.stroke()}
 requestAnimationFrame(gameLoop);
 }
 function onDown(e){
@@ -60,8 +61,6 @@ if(path.length===0)return;
 var r=c.getBoundingClientRect(),sx=c.width/r.width,sy=c.height/r.height;
 var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left,py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
 path.push({x:px*sx,y:py*sy});
-x.strokeStyle='rgba(255,200,100,.8)';x.lineWidth=6;x.lineCap='round';
-x.beginPath();x.moveTo(path[path.length-2].x,path[path.length-2].y);x.lineTo(path[path.length-1].x,path[path.length-1].y);x.stroke();
 }
 function onUp(){
 if(path.length<10)return;
