@@ -207,15 +207,15 @@
                 <div style=color:#888;font-size:10px>→ Spikes/Dmg dealt</div>
                 <div>⚖ <b>Symmetry</b>: <span id=statSym>-</span></div>
                 <div style=color:#888;font-size:10px>→ Stability/Defense</div>
-                <div>🦵 <b>Legs</b>: <span id=statLegs>-</span></div>
-                <div style=color:#888;font-size:10px>→ Base speed</div>
+                <div>🦵 <b>Protrusions</b>: <span id=statLegs>-</span></div>
+                <div style=color:#888;font-size:10px>→ Base speed (long spikes/limbs)</div>
             </div>
             <div style="margin-top:6px;padding-top:5px;border-top:1px solid #333">
                 <div style="text-align:center"><b>Ability:</b> <span id=statAbility style=color:#9b59b6>-</span></div>
                 <div id=statAbilityRule style="text-align:center;color:#666;font-size:10px;margin-top:2px"></div>
             </div>
             <div style="margin-top:4px;padding-top:4px;border-top:1px solid #222;color:#666;font-size:9px;text-align:center">
-                ⚡ Dash: 3+ legs &nbsp;|&nbsp; 🛡 Block: 4+ corners &nbsp;|&nbsp; 💚 Absorb: ≤1 corner + high symmetry
+                ⚡ Dash: 3+ protrusions &nbsp;|&nbsp; 🛡 Block: 4+ corners &nbsp;|&nbsp; 💚 Absorb: ≤1 corner + high symmetry
             </div>
         </div>
         <p id=drawStatus style=margin:4px>Draw your monster</p><button id=loadPrev
@@ -355,7 +355,7 @@
                 else if (stats.l >= 3) ab = 'dash';
                 else if (stats.c >= 4) ab = 'block';
                 var abIcons = { dash: '⚡ Dash', block: '🛡 Block', absorb: '💚 Absorb', none: '❌ None' };
-                var abDescs = { dash: 'Speed burst (3+ legs detected)', block: 'Invincible 4s (4+ corners detected)', absorb: 'Reflect damage & heal 2s (≤1 corner + >70% symmetry)', none: 'No special ability' };
+                var abDescs = { dash: 'Speed burst (3+ protrusions detected)', block: 'Invincible 4s (4+ corners detected)', absorb: 'Reflect damage & heal 2s (\u22641 corner + >70% symmetry)', none: 'No special ability' };
                 document.getElementById('statAbility').textContent = abIcons[ab] || 'None';
                 document.getElementById('statAbilityRule').textContent = abDescs[ab];
                 return stats
