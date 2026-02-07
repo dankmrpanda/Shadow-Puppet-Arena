@@ -10,11 +10,17 @@ Draw a monster silhouette. Stats come from geometry: **area = HP**, **sharp corn
 4. **Draw:** Both draw your monsters (closed shapes)
 5. **Fight:** Click "Done - Fight!" when ready. Auto-battle!
 
-## Deploy to Glitch
+## Deploy to Render
 
-1. Create new project on [glitch.com](https://glitch.com)
-2. Upload `index.html`, `server.js`, `package.json`
-3. Your game URL: `https://your-project.glitch.me`
+1. Push this project to a **GitHub** repository
+2. Go to [render.com](https://render.com) and sign up (free)
+3. Click **New** → **Web Service**
+4. Connect your GitHub account and select the repo
+5. Render auto-detects Node.js. Use these settings:
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+6. Click **Create Web Service**
+7. When deployed, your game URL: `https://your-service-name.onrender.com`
 
 ## Bundle Size
 

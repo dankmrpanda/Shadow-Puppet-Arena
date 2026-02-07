@@ -2,7 +2,7 @@ const http=require('http'),WebSocket=require('ws'),fs=require('fs');
 const rooms={};
 function code(){return Math.random().toString(36).slice(2,8).toUpperCase()}
 const server=http.createServer((req,res)=>{
-  if(req.url==='/'||req.url==='/index.html'){res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync('index.html'));return}
+  if(req.url==='/'||req.url==='/index.html'){res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync('index.html','utf8'));return}
   res.writeHead(404);res.end();
 });
 const wss=new WebSocket.Server({server});
