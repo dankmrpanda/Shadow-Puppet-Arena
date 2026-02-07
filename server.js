@@ -16,13 +16,13 @@ function spawnPack(r) {
   var margin = 30;
   var x = r.arenaL + margin + Math.random() * (r.arenaR - r.arenaL - margin * 2);
   var y = r.arenaT + margin + Math.random() * (r.arenaB - r.arenaT - margin * 2);
-  var heal = Math.floor(20 + Math.random() * 31);
+  var heal = Math.floor(15 + Math.random() * 21);
   r.packs.push({ x: x, y: y, hp: heal });
 }
 
 // Power-up types: 0=speed, 1=shield, 2=damage, 3=ghost
 const POWERUP_TYPES = ['speed', 'shield', 'damage', 'ghost'];
-const POWERUP_DURATION = { speed: 300, shield: 180, damage: 300, ghost: 240 }; // ticks (16ms each)
+const POWERUP_DURATION = { speed: 200, shield: 250, damage: 200, ghost: 180 }; // ticks (16ms each)
 function spawnPowerup(r) {
   var margin = 40;
   var x = r.arenaL + margin + Math.random() * (r.arenaR - r.arenaL - margin * 2);
@@ -58,15 +58,13 @@ function startArena(roomCode) {
   r.packs = []; r.blasts = []; r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = []; r.particles = [];
   r.suddenDeath = false;
 
-  // Team mode: assign teams if 4+ players
   const pids = Object.keys(r.monsterData);
-  const teamMode = pids.length >= 4;
-  r.teamMode = teamMode;
+  r.teamMode = false;
 
   for (let ti = 0; ti < pids.length; ti++) {
     const pid = pids[ti];
     const m = r.monsterData[pid];
-    const hp = Math.min(MAX_HP, Math.max(60, Math.floor(m.a / 25)));
+    const hp = Math.min(MAX_HP, Math.max(80, Math.round(m.a * 0.6)));
     // Position monsters and aim them towards center
     const px = r.arenaL + 80 + Math.random() * (ARENA_W - 160);
     const py = r.arenaT + 60 + Math.random() * (ARENA_H - 120);
@@ -74,17 +72,13 @@ function startArena(roomCode) {
     const dx = cx - px, dy = cy - py;
     const dist = Math.hypot(dx, dy) || 1;
     const ability = detectAbility(m);
-    // Team assignment: alternating red/blue
-    const team = teamMode ? (ti % 2 === 0 ? 'red' : 'blue') : null;
-    const teamColor = team === 'red' ? '#e74c3c' : team === 'blue' ? '#3498db' : r.colors[pid] || '#9b59b6';
     r.monsters[pid] = {
       x: px, y: py,
       vx: (dx / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       vy: (dy / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       path: m.p, name: m.n || '???', baseSize: BASE_SIZE, size: BASE_SIZE, hp: hp, maxHp: hp, iframes: 0,
-      spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
-      color: teamColor, team: team,
-      // New properties
+      spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2) + (ability === 'none' ? 1 : 0), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
+      color: r.colors[pid] || '#9b59b6',
       ability: ability, abilityCooldown: 0,
       effects: {}, // { speed: ticksLeft, shield: ticksLeft, etc }
       kills: 0, trail: []
@@ -219,8 +213,8 @@ function tick(roomCode) {
     for (const id of Object.keys(r.monsters)) {
       const m = r.monsters[id];
       if (Math.hypot(m.x - lw.x, m.y - lw.y) < 60 && !m.effects.shield) {
-        m.hp -= 25;
-        r.floatTexts.push({ x: m.x, y: m.y - 30, text: '-25', color: '#ff0' });
+        m.hp -= 18;
+        r.floatTexts.push({ x: m.x, y: m.y - 30, text: '-18', color: '#ff0' });
         logs.push(m.name + ' struck by lightning!');
       }
     }
@@ -237,7 +231,7 @@ function tick(roomCode) {
   if (r.suddenDeath && r.tick % 60 === 0) {
     for (const id of Object.keys(r.monsters)) {
       const m = r.monsters[id];
-      if (!m.effects.shield) { m.hp -= 2; r.floatTexts.push({ x: m.x, y: m.y - 15, text: '-2', color: '#a00' }); }
+      if (!m.effects.shield) { m.hp -= 3; r.floatTexts.push({ x: m.x, y: m.y - 15, text: '-3', color: '#a00' }); }
     }
   }
 
@@ -272,8 +266,8 @@ function tick(roomCode) {
         const m = r.monsters[id];
         const dx = m.x - bl.x, dy = m.y - bl.y;
         const dist = Math.hypot(dx, dy) || 1;
-        if (dist < 337) {
-          const force = Math.max(0.4, (337 - dist) / 60) * bl.ticks / 3;
+        if (dist < 250) {
+          const force = Math.max(0.4, (250 - dist) / 50) * bl.ticks / 3;
           m.vx += dx / dist * force; m.vy += dy / dist * force;
         }
       }
@@ -286,7 +280,7 @@ function tick(roomCode) {
     const m = r.monsters[id];
     m.size = Math.max(8, m.baseSize * (m.hp / m.maxHp));
     // Apply speed boost effect
-    let speedMult = 1 + (1 - m.hp / m.maxHp) * 2;
+    let speedMult = 1 + (1 - m.hp / m.maxHp) * 1.5;
     if (m.effects.speed) speedMult *= 2;
     m.speed = Math.max(MIN_SPEED, m.baseSpeed * speedMult);
     m.hp = Math.min(m.hp, m.maxHp);
@@ -332,8 +326,6 @@ function tick(roomCode) {
       if (!a || !b) continue;
       // Ghost effect: pass through
       if (a.effects.ghost || b.effects.ghost) continue;
-      // Team mode: teammates don't collide for damage
-      const sameTeam = r.teamMode && a.team && b.team && a.team === b.team;
       if (!polyOverlap(a, b)) continue;
       const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy) || 0.1;
       const nx = dx / dist, ny = dy / dist;
@@ -344,23 +336,23 @@ function tick(roomCode) {
       const sep = (a.size + b.size) * 0.1;
       a.x -= nx * sep; a.y -= ny * sep; b.x += nx * sep; b.y += ny * sep;
       clampBounds(a, r); clampBounds(b, r);
-      // Damage only if no iframes, check shield, skip if same team
-      if (a.iframes <= 0 && b.iframes <= 0 && !sameTeam) {
+      // Damage only if no iframes, check shield
+      if (a.iframes <= 0 && b.iframes <= 0) {
         // Velocity-based damage multiplier: faster = more damage (0.5x at rest, 2.0x at max vel)
         const velA = Math.hypot(a.vx, a.vy);
         const velB = Math.hypot(b.vx, b.vy);
         const velMultA = 0.5 + (velA / MAX_VEL) * 1.5;
         const velMultB = 0.5 + (velB / MAX_VEL) * 1.5;
-        const baseDmgA = (b.spikes - a.stability) * 3 * (b.effects.damage ? 2 : 1);
-        const baseDmgB = (a.spikes - b.stability) * 3 * (a.effects.damage ? 2 : 1);
-        const dmgA = a.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgA * velMultB)));
-        const dmgB = b.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgB * velMultA)));
-        a.hp -= dmgA; b.hp -= dmgB; a.iframes = 20; b.iframes = 20;
+        const baseDmgA = (b.spikes - a.stability) * 2.5 * (b.effects.damage ? 2 : 1);
+        const baseDmgB = (a.spikes - b.stability) * 2.5 * (a.effects.damage ? 2 : 1);
+        const dmgA = a.effects.shield ? 0 : Math.min(20, Math.max(1, Math.round(baseDmgA * velMultB)));
+        const dmgB = b.effects.shield ? 0 : Math.min(20, Math.max(1, Math.round(baseDmgB * velMultA)));
+        a.hp -= dmgA; b.hp -= dmgB; a.iframes = 25; b.iframes = 25;
         if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA, color: velMultB > 1.2 ? '#ff0' : '#f55' });
         if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB, color: velMultA > 1.2 ? '#ff0' : '#f55' });
         // Absorb ability: heal on hit
-        if (a.ability === 'absorb' && dmgB > 0) a.hp = Math.min(a.maxHp, a.hp + Math.floor(dmgB / 2));
-        if (b.ability === 'absorb' && dmgA > 0) b.hp = Math.min(b.maxHp, b.hp + Math.floor(dmgA / 2));
+        if (a.ability === 'absorb' && dmgB > 0) a.hp = Math.min(a.maxHp, a.hp + Math.ceil(dmgB * 0.75));
+        if (b.ability === 'absorb' && dmgA > 0) b.hp = Math.min(b.maxHp, b.hp + Math.ceil(dmgA * 0.75));
         logs.push(a.name + ' -' + dmgA + ' / ' + b.name + ' -' + dmgB);
       }
     }
@@ -390,23 +382,10 @@ function tick(roomCode) {
   // Win condition
   const alive = Object.keys(r.monsters);
   let gameOver = false;
-  if (r.teamMode) {
-    // Team mode: check if only one team remains
-    const teamsAlive = new Set();
-    for (const id of alive) if (r.monsters[id].team) teamsAlive.add(r.monsters[id].team);
-    if (teamsAlive.size <= 1 && !r.done) {
-      if (teamsAlive.size === 1) {
-        const winTeam = [...teamsAlive][0];
-        logs.push('Team ' + winTeam.toUpperCase() + ' wins!');
-      } else logs.push('Draw!');
-      gameOver = true;
-    }
-  } else {
-    if (alive.length <= 1 && !r.done) {
-      if (alive.length === 1) logs.push(r.monsters[alive[0]].name + ' wins!');
-      else if (alive.length === 0) logs.push('Draw!');
-      gameOver = true;
-    }
+  if (alive.length <= 1 && !r.done) {
+    if (alive.length === 1) logs.push(r.monsters[alive[0]].name + ' wins!');
+    else if (alive.length === 0) logs.push('Draw!');
+    gameOver = true;
   }
   if (gameOver && !r.done) {
     r.done = true;
@@ -430,7 +409,7 @@ function tick(roomCode) {
     ft: floats.length ? floats : undefined,
     pt: r.particles.length ? r.particles : undefined,
     lw: r.lightningWarning, ls: r.lightningStrike,
-    sd: r.suddenDeath, tm: r.teamMode,
+    sd: r.suddenDeath,
     log: logs.length ? logs : undefined
   });
   r.players.forEach(p => { if (p.readyState === 1) p.send(data) });
@@ -481,7 +460,7 @@ wss.on('connection', ws => {
         if (r && r.monsters && !r.done && r.monsters[ws.id]) {
           const me = r.monsters[ws.id];
           if (me.abilityCooldown > 0 || me.ability === 'none') return;
-          me.abilityCooldown = 600; // 10 second cooldown
+          me.abilityCooldown = me.ability === 'dash' ? 480 : 600;
           if (me.ability === 'dash') {
             // Speed burst
             me.effects.speed = 180; // 3 second super speed
@@ -490,7 +469,7 @@ wss.on('connection', ws => {
             r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'DASH!', color: '#0ff' });
           } else if (me.ability === 'block') {
             // Temp invincibility
-            me.effects.shield = 180; // 3 seconds
+            me.effects.shield = 240; // ~4 seconds
             r.floatTexts.push({ x: me.x, y: me.y - 30, text: 'BLOCK!', color: '#88f' });
           }
           // absorb is passive, handled in collision

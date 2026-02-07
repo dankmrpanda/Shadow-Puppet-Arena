@@ -215,7 +215,7 @@
             var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev'), loadScottyBtn = document.getElementById('loadScotty'), abilityBtn = document.getElementById('abilityBtn');
             var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], ws, isReady = false, bounds = [0, 0, 900, 640];
             var blastCooldown = 0, abilityCooldown = 0, blastFx = [], floatTexts = [], isDead = false, hasSavedShape = false, savedPath = [];
-            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none', teamMode = false, isScotty = false;
+            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none', isScotty = false;
             var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + (location.host || 'localhost:3000');
             var retries = 0;
             function post(m) { msg.textContent = m; msg.style.color = '#888' }
@@ -236,7 +236,7 @@
                         if (d.b) bounds = d.b;
                         if (d.bl) for (var bi = 0; bi < d.bl.length; bi++) blastFx.push({ x: d.bl[bi].x, y: d.bl[bi].y, age: 0 });
                         if (d.ft) for (var fi = 0; fi < d.ft.length; fi++) floatTexts.push({ x: d.ft[fi].x, y: d.ft[fi].y, text: d.ft[fi].text, color: d.ft[fi].color, age: 0 });
-                        lightningWarning = d.lw; lightningStrike = d.ls; suddenDeath = d.sd; teamMode = d.tm;
+                        lightningWarning = d.lw; lightningStrike = d.ls; suddenDeath = d.sd;
                         lobby.style.display = 'none'; ui.style.display = 'none'; arena.style.display = 'flex';
                         if (d.log) for (var i = 0; i < d.log.length; i++) addLog(d.log[i]);
                         if (!monsters[playerId] && !isDead) { isDead = true; blastBtn.disabled = true; blastBtn.style.background = '#333'; abilityBtn.disabled = true; abilityBtn.style.background = '#333'; }
@@ -272,8 +272,9 @@
                 var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < pts.length; i++) { mx = Math.min(mx, pts[i].x); my = Math.min(my, pts[i].y); Mx = Math.max(Mx, pts[i].x); My = Math.max(My, pts[i].y) }
                 var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
                 var outP = []; var ns = Math.min(pts.length, 20); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (pts.length - 1) / (ns - 1)); outP.push([Math.round((pts[j].x * sc + ox) / 12), Math.round((pts[j].y * sc + oy) / 12)]) }
-                if (isScotty) return { a: 999, c: 20, s: 1.0, l: 5, p: outP, n: 'Scotty' };
-                return { a: 0, c: corners, s: sym, l: legs, p: outP, n: (document.getElementById('mname').value || '???').slice(0, 12) }
+                var area = 0; for (var i = 0; i < outP.length; i++) { var j2 = (i + 1) % outP.length; area += outP[i][0] * outP[j2][1] - outP[j2][0] * outP[i][1] } area = Math.abs(area) / 2;
+                if (isScotty) return { a: area, c: 20, s: 1.0, l: 5, p: outP, n: 'Scotty' };
+                return { a: area, c: corners, s: sym, l: legs, p: outP, n: (document.getElementById('mname').value || '???').slice(0, 12) }
             }
             function drawMonster() {
                 var ctx = c.getContext('2d'), pts = path;
@@ -285,7 +286,7 @@
                 if (name) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, W / 2, 20) }
                 return stats
             }
-            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 3s', absorb: 'Heal on hit (passive)', none: '' };
+            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 4s', absorb: 'Heal 75% on hit', none: '' };
             var abilityIcons = { dash: '⚡', block: '🛡', absorb: '💚', none: '' };
             var puLabels = { speed: '2x SPEED', shield: 'SHIELD', damage: '2x DMG', ghost: 'PHASE' };
             function renderArena() {
@@ -367,18 +368,26 @@
                         }
                         ctx.globalAlpha = 1;
                     }
-                    // Effect glow + label
+                    // Effect glow + label - compute bounding radius from actual shape vertices
                     if (m.effects && (m.effects.speed || m.effects.shield || m.effects.damage || m.effects.ghost)) {
+                        var maxR = 0;
+                        for (var ei = 0; ei < m.path.length; ei++) {
+                            var edx = (m.path[ei][0] * 12 - pcx) * sc;
+                            var edy = (m.path[ei][1] * 12 - pcy) * sc;
+                            var er = Math.hypot(edx, edy);
+                            if (er > maxR) maxR = er;
+                        }
+                        var glowR = maxR + 8;
                         ctx.save(); ctx.globalAlpha = 0.35;
                         ctx.fillStyle = m.effects.shield ? '#08f' : m.effects.speed ? '#ff0' : m.effects.damage ? '#f00' : '#aaa';
-                        ctx.beginPath(); ctx.arc(m.x, m.y, m.size + 12, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(m.x, m.y, glowR, 0, Math.PI * 2); ctx.fill();
                         ctx.restore();
                         // Small effect label below monster
                         var eLbl = m.effects.shield ? '🛡 SHIELD' : m.effects.speed ? '⚡ FAST' : m.effects.damage ? '💥 2xDMG' : '👻 PHASE';
                         var eClr = m.effects.shield ? '#4af' : m.effects.speed ? '#ff0' : m.effects.damage ? '#f66' : '#ccc';
                         ctx.save(); ctx.globalAlpha = 0.9;
                         ctx.fillStyle = eClr; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
-                        ctx.fillText(eLbl, m.x, m.y + m.size * 1.5 + 10);
+                        ctx.fillText(eLbl, m.x, m.y + maxR + 14);
                         ctx.restore();
                     }
                     ctx.save(); ctx.translate(m.x, m.y); ctx.scale(sc, sc);
@@ -389,8 +398,7 @@
                     ctx.restore();
                     ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(10, Math.round(12 * sc)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText(Math.ceil(m.hp), m.x, m.y);
-                    var teamLabel = teamMode && m.team ? '[' + m.team.charAt(0).toUpperCase() + '] ' : '';
-                    if (m.name) { ctx.font = Math.max(9, Math.round(10 * sc)) + 'px sans-serif'; ctx.fillText(teamLabel + m.name, m.x, m.y - m.size * 1.5 - 6) }
+                    if (m.name) { ctx.font = Math.max(9, Math.round(10 * sc)) + 'px sans-serif'; ctx.fillText(m.name, m.x, m.y - m.size * 1.5 - 6) }
                 }
                 // Death explosion particles
                 for (var pi = 0; pi < particles.length; pi++) {
@@ -507,14 +515,14 @@
             blastBtn.onclick = function () {
                 if (blastCooldown > 0 || isDead) return;
                 ws.send(JSON.stringify({ t: 'blast' }));
-                blastCooldown = 3; blastBtn.disabled = true;
+                blastCooldown = 5; blastBtn.disabled = true;
                 var cd = setInterval(function () { blastCooldown--; updateButtons(); if (blastCooldown <= 0) { clearInterval(cd); if (!isDead) { blastBtn.disabled = false; blastBtn.style.background = '' } } }, 1000);
                 updateButtons();
             };
             abilityBtn.onclick = function () {
                 if (abilityCooldown > 0 || isDead || myAbility === 'none') return;
                 ws.send(JSON.stringify({ t: 'ability' }));
-                abilityCooldown = 10; abilityBtn.disabled = true;
+                abilityCooldown = myAbility === 'dash' ? 8 : 10; abilityBtn.disabled = true;
                 var cd = setInterval(function () { abilityCooldown--; updateButtons(); if (abilityCooldown <= 0) { clearInterval(cd); if (!isDead) { abilityBtn.disabled = false; abilityBtn.style.background = '' } } }, 1000);
                 updateButtons();
             };
