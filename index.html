@@ -16,17 +16,21 @@
             background: radial-gradient(ellipse at 50% 40%, #1a1028 0%, #0d0d12 60%, #080810 100%);
             color: #e0e0e0;
             font: 14px sans-serif;
-            overflow: hidden;
-            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center
+            justify-content: center;
+            -webkit-overflow-scrolling: touch
         }
 
         #lobby {
             text-align: center;
-            padding: 15px
+            padding: 15px;
+            width: 100%;
+            max-width: 500px
         }
 
         #lobby input,
@@ -57,15 +61,20 @@
             border-radius: 8px;
             display: none;
             cursor: crosshair;
-            max-width: 95vw;
+            max-width: 90vw;
             max-height: 50vh;
-            border: 2px solid #333
+            border: 2px solid #333;
+            touch-action: none
         }
 
         #ui {
             display: none;
             padding: 10px;
-            text-align: center
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch
         }
 
         #ui input,
@@ -88,14 +97,19 @@
             flex: 1;
             flex-direction: column;
             align-items: center;
-            padding-top: 10px
+            padding-top: 10px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            min-height: 0
         }
 
         #ac {
             background: #1a1a24;
             border-radius: 8px;
             max-width: 100%;
-            max-height: 55vh
+            max-height: 55vh;
+            touch-action: pan-y
         }
 
         #qrDraw {
@@ -181,6 +195,83 @@
         #clear {
             background: #555
         }
+
+        /* Mobile responsive styles */
+        @media (max-width: 600px) {
+            body {
+                justify-content: flex-start;
+                padding-top: 10px
+            }
+
+            #lobby h1 {
+                font-size: 22px
+            }
+
+            #c {
+                max-width: 85vw;
+                max-height: 40vh
+            }
+
+            #ac {
+                max-height: 45vh;
+                width: 100%
+            }
+
+            #controls {
+                width: 95%;
+                gap: 6px
+            }
+
+            #controls button {
+                padding: 10px 4px;
+                font-size: 12px
+            }
+
+            #controls button .btn-label {
+                font-size: 13px
+            }
+
+            #log {
+                max-height: 80px;
+                width: 95%;
+                font-size: 10px
+            }
+
+            #ui {
+                padding: 6px
+            }
+
+            #ui input,
+            #ui button {
+                font-size: 13px;
+                padding: 6px;
+                margin: 3px
+            }
+
+            #statsPanel {
+                max-width: 90vw !important;
+                font-size: 10px !important
+            }
+
+            #arena {
+                padding-top: 5px;
+                padding-bottom: 10px
+            }
+        }
+
+        @media (max-height: 600px) {
+            #c {
+                max-height: 35vh
+            }
+
+            #ac {
+                max-height: 40vh
+            }
+
+            #statsPanel {
+                font-size: 9px !important
+            }
+        }
     </style>
 </head>
 
@@ -231,6 +322,7 @@
             <button id=abilityBtn><span class=btn-label>Ability</span><span class=btn-desc></span><span class=btn-cd></span></button>
         </div>
         <div id=log></div>
+        <div style="height:20px;flex-shrink:0"></div>
     </div>
     <script>
         (function () {
