@@ -9,24 +9,24 @@ const server=http.createServer((req,res)=>{
   res.writeHead(404);res.end();
 });
 const wss=new WebSocket.Server({server});
+const MAX_HP=150,BASE_SIZE=30;
 function startArena(roomCode){
   const r=rooms[roomCode];
   if(!r||r.started)return;
   r.started=true;
-  r.monsters={};
+  r.monsters={};r.tick=0;r.arenaL=0;r.arenaT=0;r.arenaR=ARENA_W;r.arenaB=ARENA_H;r.lastWallTouch=0;
   const COLORS=['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
   let idx=0;
   for(const pid of Object.keys(r.monsterData)){
     const m=r.monsterData[pid];
-    const baseSize=20+Math.min(m.a/60,30);
+    const hp=Math.min(MAX_HP,Math.max(60,Math.floor(m.a/25)));
     r.monsters[pid]={
-      x:100+Math.random()*440,y:80+Math.random()*320,
+      x:r.arenaL+80+Math.random()*(ARENA_W-160),y:r.arenaT+60+Math.random()*(ARENA_H-120),
       vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,
-      path:m.p,name:m.n||'???',baseSize:baseSize,size:baseSize,hp:Math.max(50,Math.floor(m.a/30)),maxHp:0,
+      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,
       spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:1+Math.min(m.l*0.3,1.5),speed:0,
       color:COLORS[idx++%6]
     };
-    r.monsters[pid].maxHp=r.monsters[pid].hp;
     r.monsters[pid].speed=r.monsters[pid].baseSpeed;
   }
 }
@@ -52,33 +52,58 @@ function polyOverlap(a,b){
 function tick(roomCode){
   const r=rooms[roomCode];
   if(!r||!r.monsters)return;
+  r.tick=(r.tick||0)+1;
   const logs=[];
+  // Speed boost every 8s (100 ticks at 80ms)
+  if(r.tick%100===0){
+    for(const id of Object.keys(r.monsters)){
+      r.monsters[id].baseSpeed+=0.15;
+      logs.push('Speed up!');
+    }
+  }
+  // Shrink arena if no wall touches for 20s (250 ticks)
+  let wallTouch=false;
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
-    m.size=Math.max(5,m.baseSize*(m.hp/m.maxHp));
-    m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5);
-    m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
-    const b=m.size*2;
-    if(m.x<b||m.x>ARENA_W-b)m.vx*=-1;
-    if(m.y<b||m.y>ARENA_H-b)m.vy*=-1;
-    m.x=Math.max(b,Math.min(ARENA_W-b,m.x));
-    m.y=Math.max(b,Math.min(ARENA_H-b,m.y));
+    const margin=m.size+5;
+    if(m.x-margin<r.arenaL||m.x+margin>r.arenaR||m.y-margin<r.arenaT||m.y+margin>r.arenaB)wallTouch=true;
   }
-  for(const id1 of Object.keys(r.monsters)){
-    for(const id2 of Object.keys(r.monsters)){
-      if(id1>=id2)continue;
-      const a=r.monsters[id1],b=r.monsters[id2];
+  if(wallTouch)r.lastWallTouch=r.tick;
+  if(r.tick-r.lastWallTouch>250&&(r.arenaR-r.arenaL)>200){
+    r.arenaL+=4;r.arenaT+=3;r.arenaR-=4;r.arenaB-=3;
+    r.lastWallTouch=r.tick;
+    logs.push('Arena shrinks!');
+  }
+  for(const id of Object.keys(r.monsters)){
+    const m=r.monsters[id];
+    m.size=Math.max(8,m.baseSize*(m.hp/m.maxHp));
+    m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5);
+    m.hp=Math.min(m.hp,m.maxHp);
+    m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
+    const pad=m.size;
+    if(m.x<r.arenaL+pad){m.vx=Math.abs(m.vx);m.x=r.arenaL+pad}
+    if(m.x>r.arenaR-pad){m.vx=-Math.abs(m.vx);m.x=r.arenaR-pad}
+    if(m.y<r.arenaT+pad){m.vy=Math.abs(m.vy);m.y=r.arenaT+pad}
+    if(m.y>r.arenaB-pad){m.vy=-Math.abs(m.vy);m.y=r.arenaB-pad}
+    // Cap velocity
+    const v=Math.hypot(m.vx,m.vy);if(v>6){m.vx=m.vx/v*6;m.vy=m.vy/v*6}
+  }
+  const ids=Object.keys(r.monsters);
+  for(let i=0;i<ids.length;i++){
+    for(let j=i+1;j<ids.length;j++){
+      const a=r.monsters[ids[i]],b=r.monsters[ids[j]];
+      if(!a||!b)continue;
       if(!polyOverlap(a,b))continue;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy)||0.1;
       const nx=dx/dist,ny=dy/dist;
-      const dmgA=Math.max(2,Math.round((b.spikes-a.stability)*3));
-      const dmgB=Math.max(2,Math.round((a.spikes-b.stability)*3));
+      const dmgA=Math.min(15,Math.max(1,Math.round((b.spikes-a.stability)*3)));
+      const dmgB=Math.min(15,Math.max(1,Math.round((a.spikes-b.stability)*3)));
       a.hp-=dmgA;b.hp-=dmgB;
       logs.push(a.name+' -'+dmgA+' / '+b.name+' -'+dmgB);
-      const push=(a.spikes-b.stability)*0.4+(b.spikes-a.stability)*0.4;
+      const push=Math.max(0.5,(a.spikes-b.stability+b.spikes-a.stability)*0.3);
       a.vx-=nx*push;a.vy-=ny*push;
       b.vx+=nx*push;b.vy+=ny*push;
-      const sep=(a.size+b.size)*0.15;
+      const sep=(a.size+b.size)*0.2;
       a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
     }
   }
@@ -86,8 +111,8 @@ function tick(roomCode){
     if(r.monsters[id].hp<=0){logs.push(r.monsters[id].name+' defeated!');delete r.monsters[id]}
   }
   const alive=Object.keys(r.monsters);
-  if(alive.length===1)logs.push(r.monsters[alive[0]].name+' wins!');
-  const data=JSON.stringify({t:'arena',m:r.monsters,log:logs.length?logs:undefined});
+  if(alive.length===1&&!r.winner){r.winner=true;logs.push(r.monsters[alive[0]].name+' wins!')}
+  const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],log:logs.length?logs:undefined});
   r.players.forEach(p=>{if(p.readyState===1)p.send(data)});
 }
 wss.on('connection',ws=>{

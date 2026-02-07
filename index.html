@@ -1,7 +1,7 @@
 <!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Arena</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:15px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#qr{display:none;margin:10px;background:#fff;padding:8px;border-radius:8px}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:40vh}#ui{display:none;padding:10px;text-align:center}#ui input,#ui button{font-size:14px;padding:8px;margin:4px;border-radius:6px;border:1px solid #444}#ui button{background:#4a2d8e;color:#fff}#arena{display:none;width:100%;flex:1;flex-direction:column;align-items:center}#ac{background:#1a1a24;border-radius:8px;max-width:100%;max-height:60vh}#qrDraw{display:none;margin:5px}#log{font-size:11px;color:#aaa;max-height:80px;overflow-y:auto;width:90%;text-align:left;padding:6px;background:#151520;border-radius:6px;margin-top:6px}</style></head><body><div id=lobby><h1>🦇 Shadow Puppet Arena</h1><p style=margin:8px>Draw a monster. Up to 6 players!</p><button id=create>Create Game</button><br><input id=code placeholder="Room code" maxlength=4 style=text-transform:uppercase><button id=join>Join</button><div id=qr></div><p id=msg style=margin-top:15px;color:#888>Connecting...</p></div><div id=ui style=display:none><p id=room>Room: ---</p><div id=qrDraw></div><p id=count></p><input id=mname placeholder="Name your monster" maxlength=12><br><canvas id=c width=240 height=240></canvas><p id=drawStatus style=margin:8px>Draw your monster</p><button id=done>Ready!</button><button id=unready style=display:none;background:#666>Unready</button></div><div id=arena><canvas id=ac width=640 height=480></canvas><div id=log></div></div><script>
 (function(){
 var lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),arena=document.getElementById('arena'),c=document.getElementById('c'),ac=document.getElementById('ac'),msg=document.getElementById('msg'),room=document.getElementById('room'),count=document.getElementById('count'),qr=document.getElementById('qr'),done=document.getElementById('done'),unready=document.getElementById('unready'),log=document.getElementById('log');
-var W=240,H=240,path=[],playerId=0,monsters={},ws,isReady=false;
+var W=240,H=240,path=[],playerId=0,monsters={},ws,isReady=false,bounds=[0,0,640,480];
 var WS_URL=(location.protocol==='https:'?'wss:':'ws:')+'//'+(location.host||'localhost:3000');
 var retries=0;
 function post(m){msg.textContent=m;msg.style.color='#888'}
@@ -16,7 +16,7 @@ if(d.t==='code'){room.textContent='Room: '+d.code;var joinUrl=location.origin+'/
 else if(d.t==='joined'){count.textContent=(d.count||0)+' players';post('Player joined!')}
 else if(d.t==='status'){count.textContent=d.ready+'/'+d.total+' ready'}
 else if(d.t==='start'){lobby.style.display='none';ui.style.display='block';c.style.display='block';playerId=d.id}
-else if(d.t==='arena'){monsters=d.m;lobby.style.display='none';ui.style.display='none';arena.style.display='flex';if(d.log)for(var i=0;i<d.log.length;i++)addLog(d.log[i]);renderArena()}
+else if(d.t==='arena'){monsters=d.m;if(d.b)bounds=d.b;lobby.style.display='none';ui.style.display='none';arena.style.display='flex';if(d.log)for(var i=0;i<d.log.length;i++)addLog(d.log[i]);renderArena()}
 else if(d.t==='full'){postErr('Room full')}
 else if(d.t==='invalid'){postErr('Invalid code')}}}
 function createGame(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'create'}));else postErr('Connecting...')}
@@ -51,7 +51,9 @@ return stats}
 function renderArena(){
 var ctx=ac.getContext('2d');
 ctx.fillStyle='#0d0d12';ctx.fillRect(0,0,640,480);
-ctx.strokeStyle='#333';ctx.strokeRect(2,2,636,476);
+ctx.fillStyle='#180818';ctx.fillRect(0,0,640,480);
+ctx.fillStyle='#0d0d12';ctx.fillRect(bounds[0],bounds[1],bounds[2]-bounds[0],bounds[3]-bounds[1]);
+ctx.strokeStyle='#444';ctx.lineWidth=2;ctx.strokeRect(bounds[0],bounds[1],bounds[2]-bounds[0],bounds[3]-bounds[1]);
 for(var id in monsters){
 var m=monsters[id];
 if(!m.path||!m.path.length)continue;
