@@ -163,7 +163,7 @@
         <button id=clear>Clear</button><button id=loadScotty style="background:#c0392b">Load Scotty</button><button id=done>Fight!</button>
     </div>
     <div id=arena>
-        <canvas id=ac width=640 height=480></canvas>
+        <canvas id=ac width=900 height=640></canvas>
         <div style="margin:4px"><button id=blastBtn>Blast</button><button id=abilityBtn>Ability</button></div>
         <div id=log></div>
         <button id=restart
@@ -172,7 +172,7 @@
     </div>
     <script>
         (function () {
-            var W = 640, H = 480, MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
+            var W = 900, H = 640, MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
             var path = [], myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], blastFx = [], floatTexts = [], activeBlasts = [];
             var bounds = [0, 0, W, H], tickCount = 0, suddenDeath = false, numBots = 3, gameLoop = null;
             var POWERUP_TYPES = ['speed', 'shield', 'damage', 'ghost'];
@@ -292,18 +292,18 @@
 
                 tickCount++;
 
-                if (tickCount % 625 === 0 && (bounds[2] - bounds[0]) > 200) {
-                    var ph = Math.floor(tickCount / 625), sx = Math.min(15, 5 + ph), sy = Math.min(12, 4 + Math.floor(ph * 0.8));
+                if (tickCount % 900 === 0 && (bounds[2] - bounds[0]) > 180) {
+                    var ph = Math.floor(tickCount / 900), sx = Math.min(12, 4 + ph), sy = Math.min(10, 3 + Math.floor(ph * 0.7));
                     bounds[0] += sx; bounds[1] += sy; bounds[2] -= sx; bounds[3] -= sy;
                     addLog('Arena shrinks!');
                     for (var id in monsters) clampBounds(monsters[id]);
                 }
-                var ph = Math.floor(tickCount / 625), packRate = (alive.length <= 2 ? 450 : 1200) + ph * 100;
-                if (tickCount % packRate === 0 && packs.length < 2) spawnPack();
-                if (tickCount % 750 === 0 && powerups.length < 2) spawnPowerup();
-                if (tickCount > 1875 && tickCount % (1000 - Math.min(ph * 100, 500)) === 0 && hazards.length < 3) spawnHazard();
+                var ph = Math.floor(tickCount / 900), packRate = (alive.length <= 2 ? 450 : 1200) + ph * 100;
+                if (tickCount % packRate === 0 && packs.length < 3) spawnPack();
+                if (tickCount % 900 === 0 && powerups.length < 2) spawnPowerup();
+                if (tickCount > 2700 && tickCount % (1200 - Math.min(ph * 100, 600)) === 0 && hazards.length < 3) spawnHazard();
 
-                if (tickCount > 2500 && tickCount % 625 === 500) lightningWarning = { x: rand(bounds[0] + 50, bounds[2] - 50), y: rand(bounds[1] + 50, bounds[3] - 50), t: tickCount };
+                if (tickCount > 3600 && tickCount % 900 === 500) lightningWarning = { x: rand(bounds[0] + 50, bounds[2] - 50), y: rand(bounds[1] + 50, bounds[3] - 50), t: tickCount };
                 if (lightningWarning && tickCount - lightningWarning.t === 60) {
                     lightningStrike = { x: lightningWarning.x, y: lightningWarning.y };
                     for (var id in monsters) {
@@ -315,7 +315,7 @@
                 }
                 if (lightningStrike && tickCount % 10 === 0) lightningStrike = null;
 
-                if ((bounds[2] - bounds[0]) <= 200 && !suddenDeath) { suddenDeath = true; addLog('⚠️ SUDDEN DEATH!') }
+                if ((bounds[2] - bounds[0]) <= 180 && !suddenDeath) { suddenDeath = true; addLog('⚠️ SUDDEN DEATH!') }
                 if (suddenDeath && tickCount % 60 === 0) for (var id in monsters) if (!monsters[id].effects.shield) { monsters[id].hp -= 2; floatTexts.push({ x: monsters[id].x, y: monsters[id].y - 15, text: '-2', color: '#a00', age: 0 }) }
 
                 for (var id in monsters) {

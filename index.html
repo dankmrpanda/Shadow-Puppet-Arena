@@ -203,7 +203,7 @@
             style=background:#c0392b;margin-left:4px>Load Scotty 🐕</button><button id=clear>Clear</button><button
             id=done>Ready!</button><button id=unready style=display:none;background:#666>Unready</button>
     </div>
-    <div id=arena><canvas id=ac width=640 height=480></canvas>
+    <div id=arena><canvas id=ac width=900 height=640></canvas>
         <div id=controls>
             <button id=blastBtn><span class=btn-label>💨 Blast</span><span class=btn-desc>Push all nearby</span><span class=btn-cd>Ready</span></button>
             <button id=abilityBtn><span class=btn-label>Ability</span><span class=btn-desc></span><span class=btn-cd></span></button>
@@ -213,7 +213,7 @@
     <script>
         (function () {
             var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev'), loadScottyBtn = document.getElementById('loadScotty'), abilityBtn = document.getElementById('abilityBtn');
-            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], ws, isReady = false, bounds = [0, 0, 640, 480];
+            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], ws, isReady = false, bounds = [0, 0, 900, 640];
             var blastCooldown = 0, abilityCooldown = 0, blastFx = [], floatTexts = [], isDead = false, hasSavedShape = false, savedPath = [];
             var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none', teamMode = false, isScotty = false;
             var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + (location.host || 'localhost:3000');
@@ -291,15 +291,15 @@
             function renderArena() {
                 var ctx = ac.getContext('2d');
                 // Arena background with subtle gradient
-                var bgGrad = ctx.createRadialGradient(320, 240, 50, 320, 240, 400);
+                var bgGrad = ctx.createRadialGradient(450, 320, 50, 450, 320, 500);
                 bgGrad.addColorStop(0, '#1a1020'); bgGrad.addColorStop(1, '#080810');
-                ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 640, 480);
+                ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 900, 640);
                 // Playable area
                 var bw = bounds[2] - bounds[0], bh = bounds[3] - bounds[1];
                 var aGrad = ctx.createRadialGradient(bounds[0] + bw / 2, bounds[1] + bh / 2, 30, bounds[0] + bw / 2, bounds[1] + bh / 2, Math.max(bw, bh) * 0.7);
                 aGrad.addColorStop(0, '#12121e'); aGrad.addColorStop(1, '#0a0a14');
                 ctx.fillStyle = aGrad; ctx.fillRect(bounds[0], bounds[1], bw, bh);
-                var isShrunk = bounds[0] > 0 || bounds[1] > 0 || bounds[2] < 640 || bounds[3] < 480;
+                var isShrunk = bounds[0] > 0 || bounds[1] > 0 || bounds[2] < 900 || bounds[3] < 640;
                 ctx.strokeStyle = isShrunk ? '#ff0000' : 'rgba(100,80,140,0.4)'; ctx.lineWidth = isShrunk ? 3 : 1; ctx.strokeRect(bounds[0], bounds[1], bw, bh);
 
                 // Draw hazards

@@ -1,7 +1,7 @@
 const http = require('http'), WebSocket = require('ws'), fs = require('fs');
 const rooms = {};
 const MAX_PLAYERS = 6;
-const ARENA_W = 640, ARENA_H = 480;
+const ARENA_W = 900, ARENA_H = 640;
 const MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
 function code() { var s = ''; for (var i = 0; i < 4; i++)s += 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random() * 24 | 0]; return s }
 const server = http.createServer((req, res) => {
@@ -154,13 +154,13 @@ function tick(roomCode) {
     logs.push('Speed up!');
   }
   // Shrink arena - increments grow over time
-  if (r.tick % 625 === 0 && (r.arenaR - r.arenaL) > 200) {
-    var phase = Math.floor(r.tick / 625);
-    var shrinkX = Math.min(15, 5 + phase);
-    var shrinkY = Math.min(12, 4 + Math.floor(phase * 0.8));
+  if (r.tick % 900 === 0 && (r.arenaR - r.arenaL) > 180) {
+    var phase = Math.floor(r.tick / 900);
+    var shrinkX = Math.min(12, 4 + phase);
+    var shrinkY = Math.min(10, 3 + Math.floor(phase * 0.7));
     r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
-    if (r.arenaR - r.arenaL < 200) { r.arenaL = (r.arenaL + r.arenaR) / 2 - 100; r.arenaR = r.arenaL + 200 }
-    if (r.arenaB - r.arenaT < 150) { r.arenaT = (r.arenaT + r.arenaB) / 2 - 75; r.arenaB = r.arenaT + 150 }
+    if (r.arenaR - r.arenaL < 180) { r.arenaL = (r.arenaL + r.arenaR) / 2 - 90; r.arenaR = r.arenaL + 180 }
+    if (r.arenaB - r.arenaT < 130) { r.arenaT = (r.arenaT + r.arenaB) / 2 - 65; r.arenaB = r.arenaT + 130 }
     logs.push('Arena shrinks!');
     for (const id of Object.keys(r.monsters)) clampBounds(r.monsters[id], r);
     // Remove health packs outside new bounds
@@ -171,15 +171,15 @@ function tick(roomCode) {
   }
   // Spawn health packs - slower rate as arena shrinks
   var aliveCount = Object.keys(r.monsters).length;
-  var phase = Math.floor(r.tick / 625);
+  var phase = Math.floor(r.tick / 900);
   var packRate = (aliveCount <= 2 ? 450 : aliveCount <= 3 ? 750 : 1200) + phase * 100;
-  if (r.tick % packRate === 0 && r.packs.length < 2) spawnPack(r);
+  if (r.tick % packRate === 0 && r.packs.length < 3) spawnPack(r);
 
-  // Spawn power-ups every ~12 seconds
-  if (r.tick % 750 === 0 && r.powerups.length < 2) spawnPowerup(r);
+  // Spawn power-ups every ~15 seconds
+  if (r.tick % 900 === 0 && r.powerups.length < 2) spawnPowerup(r);
 
-  // Spawn hazards after 30 seconds, more frequent as game goes on
-  if (r.tick > 1875 && r.tick % (1000 - Math.min(phase * 100, 500)) === 0 && r.hazards.length < 3) spawnHazard(r);
+  // Spawn hazards after 45 seconds, more frequent as game goes on
+  if (r.tick > 2700 && r.tick % (1200 - Math.min(phase * 100, 600)) === 0 && r.hazards.length < 3) spawnHazard(r);
 
   // Remove powerups/hazards outside arena bounds
   for (let i = r.powerups.length - 1; i >= 0; i--) {
@@ -208,7 +208,7 @@ function tick(roomCode) {
   }
 
   // Lightning strike warning + strike
-  if (r.tick > 2500 && r.tick % 625 === 500) {
+  if (r.tick > 3600 && r.tick % 900 === 500) {
     // Warning
     const x = r.arenaL + 50 + Math.random() * (r.arenaR - r.arenaL - 100);
     const y = r.arenaT + 50 + Math.random() * (r.arenaB - r.arenaT - 100);
@@ -230,7 +230,7 @@ function tick(roomCode) {
   if (r.lightningStrike && r.tick % 10 === 0) r.lightningStrike = null;
 
   // Sudden death - when arena is minimum size
-  if ((r.arenaR - r.arenaL) <= 200 && (r.arenaB - r.arenaT) <= 150 && !r.suddenDeath) {
+  if ((r.arenaR - r.arenaL) <= 180 && (r.arenaB - r.arenaT) <= 130 && !r.suddenDeath) {
     r.suddenDeath = true;
     logs.push('⚠️ SUDDEN DEATH!');
   }
