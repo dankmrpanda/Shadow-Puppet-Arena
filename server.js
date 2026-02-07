@@ -2,6 +2,7 @@ const http=require('http'),WebSocket=require('ws'),fs=require('fs');
 const rooms={};
 const MAX_PLAYERS=6;
 const ARENA_W=640,ARENA_H=480;
+const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.8,MAX_VEL=6;
 function code(){var s='';for(var i=0;i<4;i++)s+='ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0];return s}
 const server=http.createServer((req,res)=>{
   const u=req.url.split('?')[0];
@@ -9,12 +10,21 @@ const server=http.createServer((req,res)=>{
   res.writeHead(404);res.end();
 });
 const wss=new WebSocket.Server({server});
-const MAX_HP=150,BASE_SIZE=30;
+
+function spawnPack(r){
+  var margin=30;
+  var x=r.arenaL+margin+Math.random()*(r.arenaR-r.arenaL-margin*2);
+  var y=r.arenaT+margin+Math.random()*(r.arenaB-r.arenaT-margin*2);
+  var heal=Math.floor(10+Math.random()*20);
+  r.packs.push({x:x,y:y,hp:heal});
+}
+
 function startArena(roomCode){
   const r=rooms[roomCode];
   if(!r||r.started)return;
   r.started=true;
-  r.monsters={};r.tick=0;r.arenaL=0;r.arenaT=0;r.arenaR=ARENA_W;r.arenaB=ARENA_H;r.lastWallTouch=0;
+  r.monsters={};r.tick=0;r.arenaL=0;r.arenaT=0;r.arenaR=ARENA_W;r.arenaB=ARENA_H;
+  r.packs=[];r.blasts=[];
   const COLORS=['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
   let idx=0;
   for(const pid of Object.keys(r.monsterData)){
@@ -27,8 +37,10 @@ function startArena(roomCode){
       spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:1+Math.min(m.l*0.3,1.5),speed:0,
       color:COLORS[idx++%6]
     };
-    r.monsters[pid].speed=r.monsters[pid].baseSpeed;
+    r.monsters[pid].speed=Math.max(MIN_SPEED,r.monsters[pid].baseSpeed);
   }
+  // Spawn initial health packs
+  spawnPack(r);spawnPack(r);
 }
 function verts(m){
   const s=m.size/40;let cx=0,cy=0;
@@ -52,6 +64,15 @@ function polyOverlap(a,b){
   for(let i=0;i<vb.length;i++)if(ptInPoly(vb[i][0],vb[i][1],va))return true;
   return false;
 }
+
+function clampBounds(m,r){
+  const pad=3;
+  if(m.x<r.arenaL+pad){m.vx=Math.abs(m.vx)+0.5;m.x=r.arenaL+pad}
+  if(m.x>r.arenaR-pad){m.vx=-(Math.abs(m.vx)+0.5);m.x=r.arenaR-pad}
+  if(m.y<r.arenaT+pad){m.vy=Math.abs(m.vy)+0.5;m.y=r.arenaT+pad}
+  if(m.y>r.arenaB-pad){m.vy=-(Math.abs(m.vy)+0.5);m.y=r.arenaB-pad}
+}
+
 function tick(roomCode){
   const r=rooms[roomCode];
   if(!r||!r.monsters||r.done)return;
@@ -62,35 +83,64 @@ function tick(roomCode){
     for(const id of Object.keys(r.monsters))r.monsters[id].baseSpeed+=0.15;
     logs.push('Speed up!');
   }
-  // Shrink arena every 10s (125 ticks)
+  // Shrink arena - increments grow over time
   if(r.tick%125===0&&(r.arenaR-r.arenaL)>200){
-    r.arenaL+=5;r.arenaT+=4;r.arenaR-=5;r.arenaB-=4;
+    var phase=Math.floor(r.tick/125);
+    var shrinkX=Math.min(15,5+phase);
+    var shrinkY=Math.min(12,4+Math.floor(phase*0.8));
+    r.arenaL+=shrinkX;r.arenaT+=shrinkY;r.arenaR-=shrinkX;r.arenaB-=shrinkY;
+    if(r.arenaR-r.arenaL<200){r.arenaL=(r.arenaL+r.arenaR)/2-100;r.arenaR=r.arenaL+200}
+    if(r.arenaB-r.arenaT<150){r.arenaT=(r.arenaT+r.arenaB)/2-75;r.arenaB=r.arenaT+150}
     logs.push('Arena shrinks!');
-    // Push monsters inward if border crossed them
-    for(const id of Object.keys(r.monsters)){
-      const m=r.monsters[id],pad=3;
-      if(m.x<r.arenaL+pad){m.x=r.arenaL+pad;m.vx=Math.abs(m.vx)}
-      if(m.x>r.arenaR-pad){m.x=r.arenaR-pad;m.vx=-Math.abs(m.vx)}
-      if(m.y<r.arenaT+pad){m.y=r.arenaT+pad;m.vy=Math.abs(m.vy)}
-      if(m.y>r.arenaB-pad){m.y=r.arenaB-pad;m.vy=-Math.abs(m.vy)}
+    for(const id of Object.keys(r.monsters))clampBounds(r.monsters[id],r);
+  }
+  // Spawn health pack every 15s (187 ticks), max 3 on field
+  if(r.tick%187===0&&r.packs.length<3)spawnPack(r);
+  // Process blasts
+  if(r.blasts&&r.blasts.length){
+    for(const bl of r.blasts){
+      for(const id of Object.keys(r.monsters)){
+        const m=r.monsters[id];
+        const dx=m.x-bl.x,dy=m.y-bl.y;
+        const dist=Math.hypot(dx,dy)||1;
+        if(dist<120){
+          const force=Math.max(0.5,(120-dist)/30);
+          m.vx+=dx/dist*force;m.vy+=dy/dist*force;
+        }
+      }
+      logs.push('BLAST!');
     }
+    r.blasts=[];
   }
   // Tick down iframes
   for(const id of Object.keys(r.monsters))if(r.monsters[id].iframes>0)r.monsters[id].iframes--;
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
     m.size=Math.max(8,m.baseSize*(m.hp/m.maxHp));
-    m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5);
+    m.speed=Math.max(MIN_SPEED,m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5));
     m.hp=Math.min(m.hp,m.maxHp);
+    // Ensure minimum velocity magnitude
+    const curV=Math.hypot(m.vx,m.vy);
+    if(curV<MIN_SPEED&&curV>0.01){m.vx=m.vx/curV*MIN_SPEED;m.vy=m.vy/curV*MIN_SPEED}
+    else if(curV<=0.01){var a=Math.random()*Math.PI*2;m.vx=Math.cos(a)*MIN_SPEED;m.vy=Math.sin(a)*MIN_SPEED}
     m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
-    const pad=3;
-    if(m.x<r.arenaL+pad){m.vx=Math.abs(m.vx);m.x=r.arenaL+pad}
-    if(m.x>r.arenaR-pad){m.vx=-Math.abs(m.vx);m.x=r.arenaR-pad}
-    if(m.y<r.arenaT+pad){m.vy=Math.abs(m.vy);m.y=r.arenaT+pad}
-    if(m.y>r.arenaB-pad){m.vy=-Math.abs(m.vy);m.y=r.arenaB-pad}
+    clampBounds(m,r);
     // Cap velocity
-    const v=Math.hypot(m.vx,m.vy);if(v>6){m.vx=m.vx/v*6;m.vy=m.vy/v*6}
+    const v=Math.hypot(m.vx,m.vy);if(v>MAX_VEL){m.vx=m.vx/v*MAX_VEL;m.vy=m.vy/v*MAX_VEL}
   }
+  // Health pack pickup
+  for(const id of Object.keys(r.monsters)){
+    const m=r.monsters[id];
+    for(let pi=r.packs.length-1;pi>=0;pi--){
+      const pk=r.packs[pi];
+      if(Math.hypot(m.x-pk.x,m.y-pk.y)<m.size+10){
+        m.hp=Math.min(m.maxHp,m.hp+pk.hp);
+        logs.push(m.name+' +'+pk.hp+'hp!');
+        r.packs.splice(pi,1);
+      }
+    }
+  }
+  // Collision
   const ids=Object.keys(r.monsters);
   for(let i=0;i<ids.length;i++){
     for(let j=i+1;j<ids.length;j++){
@@ -108,8 +158,9 @@ function tick(roomCode){
       const push=Math.max(0.5,(a.spikes-b.stability+b.spikes-a.stability)*0.3);
       a.vx-=nx*push;a.vy-=ny*push;
       b.vx+=nx*push;b.vy+=ny*push;
-      const sep=(a.size+b.size)*0.25;
+      const sep=(a.size+b.size)*0.4;
       a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
+      clampBounds(a,r);clampBounds(b,r);
     }
   }
   for(const id of Object.keys(r.monsters)){
@@ -121,7 +172,7 @@ function tick(roomCode){
     else if(alive.length===0)logs.push('Draw!');
     r.done=true;
   }
-  const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],log:logs.length?logs:undefined});
+  const data=JSON.stringify({t:'arena',m:r.monsters,b:[r.arenaL,r.arenaT,r.arenaR,r.arenaB],pk:r.packs,log:logs.length?logs:undefined});
   r.players.forEach(p=>{if(p.readyState===1)p.send(data)});
 }
 wss.on('connection',ws=>{
@@ -153,6 +204,12 @@ wss.on('connection',ws=>{
       delete r.monsterData[ws.id];
       const ready=Object.keys(r.monsterData).length;
       r.players.forEach(p=>p.send(JSON.stringify({t:'status',ready:ready,total:r.players.length})));
+    }else if(d.t==='blast'&&ws.room){
+      const r=rooms[ws.room];
+      if(r&&r.monsters&&!r.done&&typeof d.x==='number'&&typeof d.y==='number'){
+        if(!r.blasts)r.blasts=[];
+        r.blasts.push({x:d.x,y:d.y,by:ws.id});
+      }
     }}
     catch(e){}
   });
