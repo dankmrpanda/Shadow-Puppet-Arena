@@ -139,8 +139,9 @@ function tick(roomCode) {
   if (!r || !r.monsters || r.done) return;
   r.tick = (r.tick || 0) + 1;
   const logs = [];
+  const GRACE_PERIOD = 312; // 5 seconds at ~16ms per tick
   // Speed boost every 6s (375 ticks at 16ms)
-  if (r.tick % 375 === 0) {
+  if (r.tick > GRACE_PERIOD && r.tick % 375 === 0) {
     for (const id of Object.keys(r.monsters)) { var m = r.monsters[id]; m.baseSpeed = Math.min(1.5, m.baseSpeed + 0.03) }
     logs.push('Speed up!');
   }
@@ -150,7 +151,7 @@ function tick(roomCode) {
   var elapsedSec = r.tick / 62.5; // ~62.5 ticks per second at 16ms
   // Base interval shrinks over time: starts at 14s, drops to 6s by 2min
   var baseInterval = is1v1 ? 300 : Math.max(375, Math.round(900 - elapsedSec * 3));
-  if (r.tick % baseInterval === 0 && r.tick > 0 && (r.arenaR - r.arenaL) > 180) {
+  if (r.tick % baseInterval === 0 && r.tick > GRACE_PERIOD && (r.arenaR - r.arenaL) > 180) {
     var currentW = r.arenaR - r.arenaL;
     var currentH = r.arenaB - r.arenaT;
     // Shrink percentage scales with time: 3% early -> 10% late, 1v1 even faster
@@ -172,13 +173,13 @@ function tick(roomCode) {
   // Spawn health packs - slower rate as arena shrinks
   var phase = Math.floor(r.tick / 900);
   var packRate = (aliveCount <= 2 ? 450 : aliveCount <= 3 ? 750 : 1200) + phase * 100;
-  if (r.tick % packRate === 0 && r.packs.length < 3) spawnPack(r);
+  if (r.tick > GRACE_PERIOD && r.tick % packRate === 0 && r.packs.length < 3) spawnPack(r);
 
   // Spawn power-ups every ~15 seconds
-  if (r.tick % 900 === 0 && r.powerups.length < 2) spawnPowerup(r);
+  if (r.tick > GRACE_PERIOD && r.tick % 900 === 0 && r.powerups.length < 2) spawnPowerup(r);
 
   // Spawn hazards after 45 seconds, more frequent as game goes on
-  if (r.tick > 2700 && r.tick % (1200 - Math.min(phase * 100, 600)) === 0 && r.hazards.length < 3) spawnHazard(r);
+  if (r.tick > Math.max(GRACE_PERIOD, 2700) && r.tick % (1200 - Math.min(phase * 100, 600)) === 0 && r.hazards.length < 3) spawnHazard(r);
 
   // Remove powerups/hazards outside arena bounds
   for (let i = r.powerups.length - 1; i >= 0; i--) {
