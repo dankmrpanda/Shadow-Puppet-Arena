@@ -346,11 +346,11 @@ function tick(roomCode) {
       clampBounds(a, r); clampBounds(b, r);
       // Damage only if no iframes, check shield, skip if same team
       if (a.iframes <= 0 && b.iframes <= 0 && !sameTeam) {
-        // Velocity-based damage multiplier (only at high speeds, vel > 2.5)
+        // Velocity-based damage multiplier: faster = more damage (0.5x at rest, 2.0x at max vel)
         const velA = Math.hypot(a.vx, a.vy);
         const velB = Math.hypot(b.vx, b.vy);
-        const velMultA = velA > 2.5 ? 1 + (velA - 2.5) / 2 : 1; // 1x to 1.75x at max vel 4
-        const velMultB = velB > 2.5 ? 1 + (velB - 2.5) / 2 : 1;
+        const velMultA = 0.5 + (velA / MAX_VEL) * 1.5;
+        const velMultB = 0.5 + (velB / MAX_VEL) * 1.5;
         const baseDmgA = (b.spikes - a.stability) * 3 * (b.effects.damage ? 2 : 1);
         const baseDmgB = (a.spikes - b.stability) * 3 * (a.effects.damage ? 2 : 1);
         const dmgA = a.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgA * velMultB)));

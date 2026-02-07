@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__render__list_workspaces",
+      "mcp__render__list_services",
+      "mcp__render__list_deploys",
+      "mcp__render__list_logs"
+    ]
+  }
+}

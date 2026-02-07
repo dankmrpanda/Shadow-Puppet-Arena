@@ -171,7 +171,7 @@
             Again</button>
     </div>
     <script>
-        window.addEventListener('load', function () {
+        (function () {
             var W = 640, H = 480, MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
             var path = [], myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], blastFx = [], floatTexts = [], activeBlasts = [];
             var bounds = [0, 0, W, H], tickCount = 0, suddenDeath = false, numBots = 3, gameLoop = null;
@@ -395,7 +395,7 @@
                         clampBounds(a); clampBounds(b);
                         if (a.iframes <= 0 && b.iframes <= 0) {
                             var va = Math.hypot(a.vx, a.vy), vb = Math.hypot(b.vx, b.vy);
-                            var vma = va > 2.5 ? 1 + (va - 2.5) / 2 : 1, vmb = vb > 2.5 ? 1 + (vb - 2.5) / 2 : 1;
+                            var vma = 0.5 + (va / MAX_VEL) * 1.5, vmb = 0.5 + (vb / MAX_VEL) * 1.5;
                             var bda = (b.spikes - a.stability) * 3 * (b.effects.damage ? 2 : 1), bdb = (a.spikes - b.stability) * 3 * (a.effects.damage ? 2 : 1);
                             var da = a.effects.shield ? 0 : Math.ceil(Math.max(1, bda * vmb)), db = b.effects.shield ? 0 : Math.ceil(Math.max(1, bdb * vma));
                             a.hp -= da; b.hp -= db; a.iframes = 20; b.iframes = 20;
@@ -592,7 +592,7 @@
                 }
             }, 16);
             if (restartBtn) restartBtn.onclick = function () { arena.style.display = 'none'; menu.style.display = 'block'; path = []; };
-        });
+        })();
     </script>
 </body>
 

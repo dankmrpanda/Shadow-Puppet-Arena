@@ -78,14 +78,37 @@ This repository includes a standalone, offline-compatible version of the game de
   - Full game mechanics (drawing, physics, abilities, power-ups, hazards)
   - Works completely offline (tested with `verify.ps1`)
 
-### How to Verify (Contest Script)
+### How to Compress & Verify
 
-1. Ensure `shadow-puppet-arena.tar.gz` is in the directory.
-2. Run the contest verification script:
-   ```powershell
-   ./verify.ps1 shadow-puppet-arena.tar.gz
-   ```
-   *(Note: The script serves on port 8080)*
+**Compress** the offline HTML into a `.tar.gz` archive:
+
+```powershell
+# Windows (PowerShell)
+New-Item -ItemType Directory -Path "index_temp" -Force | Out-Null
+Copy-Item "offline.html" "index_temp\index.html" -Force
+tar -czf "offline.tar.gz" -C "index_temp" "index.html"
+Remove-Item -Recurse -Force "index_temp"
+```
+
+```bash
+# Linux / macOS
+mkdir -p index_temp
+cp offline.html index_temp/index.html
+tar -czf offline.tar.gz -C index_temp index.html
+rm -rf index_temp
+```
+
+**Verify** by extracting and serving locally:
+
+```powershell
+# Windows (PowerShell) — serves on port 8080
+./verify.ps1 offline.tar.gz
+```
+
+```bash
+# Linux / macOS — serves on port 8000
+./verify.sh offline.tar.gz
+```
 
 ## Bundle Size
 
