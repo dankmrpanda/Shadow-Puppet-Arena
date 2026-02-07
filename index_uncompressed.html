@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8>
+    <meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no">
+    <title>Shadow Puppet Arena</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            background: #0d0d12;
+            color: #e0e0e0;
+            font: 14px sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center
+        }
+
+        #lobby {
+            text-align: center;
+            padding: 15px
+        }
+
+        #lobby input,
+        #lobby button {
+            font-size: 16px;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 6px;
+            border: 1px solid #444
+        }
+
+        #lobby button {
+            background: #4a2d8e;
+            color: #fff;
+            cursor: pointer
+        }
+
+        #qr {
+            display: none;
+            margin: 10px;
+            background: #fff;
+            padding: 8px;
+            border-radius: 8px
+        }
+
+        #c {
+            background: #1a1a24;
+            border-radius: 8px;
+            display: none;
+            cursor: crosshair;
+            max-width: 95vw;
+            max-height: 50vh;
+            border: 2px solid #333
+        }
+
+        #ui {
+            display: none;
+            padding: 10px;
+            text-align: center
+        }
+
+        #ui input,
+        #ui button {
+            font-size: 14px;
+            padding: 8px;
+            margin: 4px;
+            border-radius: 6px;
+            border: 1px solid #444
+        }
+
+        #ui button {
+            background: #4a2d8e;
+            color: #fff
+        }
+
+        #arena {
+            display: none;
+            width: 100%;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px
+        }
+
+        #ac {
+            background: #1a1a24;
+            border-radius: 8px;
+            max-width: 100%;
+            max-height: 55vh
+        }
+
+        #qrDraw {
+            display: none;
+            margin: 5px
+        }
+
+        #log {
+            font-size: 11px;
+            color: #aaa;
+            max-height: 60px;
+            overflow-y: auto;
+            width: 90%;
+            text-align: left;
+            padding: 6px;
+            background: #151520;
+            border-radius: 6px;
+            margin-top: 4px
+        }
+
+        #blastBtn {
+            background: #c0392b;
+            color: #fff;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            margin-top: 4px;
+            cursor: pointer;
+            display: none
+        }
+
+        #blastBtn:disabled {
+            background: #555;
+            cursor: default
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #888;
+            margin: 4px
+        }
+
+        #clear {
+            background: #555
+        }
+    </style>
+</head>
+
+<body>
+    <div id=lobby>
+        <h1>Shadow Puppet Arena</h1>
+        <p style=margin:8px>Draw a monster. Up to 6 players!</p><button id=create>Create Game</button><br><input id=code
+            placeholder="Room code" maxlength=4 style=text-transform:uppercase><button id=join>Join</button>
+        <div id=qr></div>
+        <p id=msg style=margin-top:15px;color:#888>Connecting...</p>
+    </div>
+    <div id=ui style=display:none>
+        <p id=room>Room: ---</p>
+        <div id=qrDraw></div>
+        <p id=count></p><input id=mname placeholder="Name your monster" maxlength=12><br><canvas id=c width=300
+            height=300></canvas>
+        <p class=hint>Draw in ONE stroke. Shape will auto-close.</p>
+        <p id=drawStatus style=margin:4px>Draw your monster</p><button id=clear>Clear</button><button
+            id=done>Ready!</button><button id=unready style=display:none;background:#666>Unready</button>
+    </div>
+    <div id=arena><canvas id=ac width=640 height=480></canvas><button id=blastBtn>Blast (ready)</button>
+        <div id=log></div>
+    </div>
+    <script>
+        (function () {
+            var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear');
+            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], ws, isReady = false, bounds = [0, 0, 640, 480];
+            var blastCooldown = 0, blastFx = [], isDead = false, hasSavedShape = false;
+            var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + (location.host || 'localhost:3000');
+            var retries = 0;
+            function post(m) { msg.textContent = m; msg.style.color = '#888' }
+            function postErr(m) { msg.textContent = m; msg.style.color = '#e66' }
+            function addLog(t) { log.innerHTML += '<div>' + t + '</div>'; log.scrollTop = log.scrollHeight }
+            function connect() {
+                post(retries ? 'Retrying...' : 'Connecting...'); ws = new WebSocket(WS_URL);
+                ws.onopen = function () { retries = 0; post('Connected!'); var r = null, u = new URL(location.href); if (u.searchParams.get('room')) r = u.searchParams.get('room'); var m = location.pathname.match(/\/join\/([A-Za-z]{4})/i); if (m) r = m[1]; if (r) { var code = r.toUpperCase().slice(0, 4); document.getElementById('code').value = code; ws.send(JSON.stringify({ t: 'join', code: code })) } };
+                ws.onclose = function () { postErr('Disconnected.' + (retries < 5 ? ' Retrying...' : ' Refresh.')); if (retries < 5) { retries++; setTimeout(connect, 3000) } };
+                ws.onmessage = function (e) {
+                    var d = JSON.parse(e.data);
+                    if (d.t === 'code') { room.textContent = 'Room: ' + d.code; var joinUrl = location.origin + '/join/' + d.code; var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(joinUrl); qr.innerHTML = '<img src="' + qrUrl + '" alt=QR>'; qr.style.display = 'block'; document.getElementById('qrDraw').innerHTML = '<img src="' + qrUrl + '" alt=QR style=background:#fff;padding:4px;border-radius:6px>'; document.getElementById('qrDraw').style.display = 'block'; post('Share QR or code: ' + d.code) }
+                    else if (d.t === 'joined') { count.textContent = (d.count || 0) + ' players'; post('Player joined!') }
+                    else if (d.t === 'status') { count.textContent = d.ready + '/' + d.total + ' ready' }
+                    else if (d.t === 'start') { lobby.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; playerId = d.id; if (d.color) myColor = d.color }
+                    else if (d.t === 'arena') {
+                        monsters = d.m; packs = d.pk || []; if (d.b) bounds = d.b; if (d.bl) for (var bi = 0; bi < d.bl.length; bi++)blastFx.push({ x: d.bl[bi].x, y: d.bl[bi].y, age: 0 }); lobby.style.display = 'none'; ui.style.display = 'none'; arena.style.display = 'flex'; blastBtn.style.display = 'inline-block'; if (d.log) for (var i = 0; i < d.log.length; i++)addLog(d.log[i]);
+                        if (!monsters[playerId] && !isDead) { isDead = true; blastBtn.disabled = true; blastBtn.textContent = 'Dead'; blastBtn.style.background = '#333' }
+                        renderArena()
+                    }
+                    else if (d.t === 'restart') { isDead = false; hasSavedShape = true; arena.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; isReady = false; done.style.display = 'inline-block'; unready.style.display = 'none'; blastBtn.disabled = false; blastBtn.style.background = '#c0392b'; blastBtn.textContent = 'Blast (ready)'; blastCooldown = 0; blastFx = []; document.getElementById('drawStatus').textContent = 'Press Ready to keep shape, or redraw'; document.getElementById('drawStatus').style.color = '#888'; if (path.length > 3) drawMonster() }
+                    else if (d.t === 'full') { postErr('Room full') }
+                    else if (d.t === 'invalid') { postErr('Invalid code') }
+                }
+            }
+            function createGame() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'create' })); else postErr('Connecting...') }
+            function joinGame() {
+                var code = document.getElementById('code').value.toUpperCase().slice(0, 4); if (!code || code.length < 4) { postErr('Code is 4 letters'); return }
+                ws.send(JSON.stringify({ t: 'join', code: code }))
+            }
+            document.getElementById('create').onclick = createGame;
+            document.getElementById('join').onclick = joinGame;
+            function analyze() {
+                var ctx = c.getContext('2d'), id = ctx.getImageData(0, 0, W, H), d = id.data;
+                var area = 0; for (var i = 0; i < d.length; i += 4)if (d[i] > 200) area++;
+                var pts = path; if (path.length > 25) { pts = []; for (var i = 0; i < 20; i++)pts.push(path[Math.floor(i * (path.length - 1) / 19)]) }
+                var corners = 0; for (var i = 2; i < pts.length; i++) { var a = Math.atan2(pts[i].y - pts[i - 1].y, pts[i].x - pts[i - 1].x), b = Math.atan2(pts[i - 1].y - pts[i - 2].y, pts[i - 1].x - pts[i - 2].x); var diff = Math.abs(a - b); if (diff > Math.PI) diff = 2 * Math.PI - diff; if (diff > 1.0) corners++ }
+                var cx = 0, cy = 0; for (var i = 0; i < pts.length; i++) { cx += pts[i].x; cy += pts[i].y } cx /= pts.length; cy /= pts.length;
+                var left = 0, right = 0; for (var i = 0; i < pts.length; i++) { var v = pts[i].y - cy; if (pts[i].x < cx) left += v * v; else right += v * v }
+                var sym = Math.min(1, 1 - Math.abs(left - right) / (left + right + 1));
+                var segs = []; for (var i = 1; i < pts.length; i++)segs.push(Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+                var avg = segs.reduce(function (a, b) { return a + b }, 0) / segs.length; var legs = 0; for (var i = 0; i < segs.length; i++)if (segs[i] > avg * 1.8) legs++;
+                var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < pts.length; i++) { mx = Math.min(mx, pts[i].x); my = Math.min(my, pts[i].y); Mx = Math.max(Mx, pts[i].x); My = Math.max(My, pts[i].y) }
+                var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
+                var p = []; var ns = Math.min(pts.length, 20); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (pts.length - 1) / (ns - 1)); p.push([Math.round((pts[j].x * sc + ox) / 12), Math.round((pts[j].y * sc + oy) / 12)]) }
+                return { a: area, c: corners, s: sym, l: legs, p: p, n: (document.getElementById('mname').value || '???').slice(0, 12) }
+            }
+            function drawMonster() {
+                var ctx = c.getContext('2d'), pts = path;
+                if (pts.length < 3) return null;
+                ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++)ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fill('evenodd');
+                var stats = analyze();
+                ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++)ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fill('evenodd');
+                var name = document.getElementById('mname').value || '';
+                if (name) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, W / 2, 20) }
+                return stats
+            }
+            function renderArena() {
+                var ctx = ac.getContext('2d');
+                ctx.fillStyle = '#180818'; ctx.fillRect(0, 0, 640, 480);
+                ctx.fillStyle = '#0d0d12'; ctx.fillRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.strokeRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+                for (var pi = 0; pi < packs.length; pi++) {
+                    var pk = packs[pi];
+                    ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(pk.x, pk.y, 10, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillRect(pk.x - 6, pk.y - 2, 12, 4); ctx.fillRect(pk.x - 2, pk.y - 6, 4, 12);
+                    ctx.fillStyle = '#155d32'; ctx.font = 'bold 9px sans-serif'; ctx.fillText(pk.hp, pk.x, pk.y + 16);
+                }
+                for (var id in monsters) {
+                    var m = monsters[id];
+                    if (!m.path || !m.path.length) continue;
+                    var sc = m.size / 40;
+                    var pcx = 0, pcy = 0; for (var i = 0; i < m.path.length; i++) { pcx += m.path[i][0] * 12; pcy += m.path[i][1] * 12 } pcx /= m.path.length; pcy /= m.path.length;
+                    ctx.save(); ctx.translate(m.x, m.y); ctx.scale(sc, sc);
+                    ctx.fillStyle = m.color; ctx.beginPath();
+                    ctx.moveTo((m.path[0][0] * 12 - pcx), (m.path[0][1] * 12 - pcy));
+                    for (var i = 1; i < m.path.length; i++)ctx.lineTo((m.path[i][0] * 12 - pcx), (m.path[i][1] * 12 - pcy));
+                    ctx.closePath(); ctx.fill('evenodd');
+                    ctx.restore();
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(10, Math.round(12 * sc)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(Math.ceil(m.hp), m.x, m.y);
+                    if (m.name) { ctx.font = Math.max(9, Math.round(10 * sc)) + 'px sans-serif'; ctx.fillText(m.name, m.x, m.y - m.size * 1.5 - 6) }
+                }
+                for (var bi = blastFx.length - 1; bi >= 0; bi--) {
+                    var bf = blastFx[bi]; bf.age++;
+                    var r = bf.age * 4; var alpha = Math.max(0, 1 - bf.age / 20);
+                    ctx.strokeStyle = 'rgba(255,255,255,' + alpha + ')'; ctx.lineWidth = Math.max(1, 4 - bf.age * 0.15);
+                    ctx.beginPath(); ctx.arc(bf.x, bf.y, r, 0, Math.PI * 2); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(255,255,255,' + (alpha * 0.5) + ')'; ctx.beginPath(); ctx.arc(bf.x, bf.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
+                    if (bf.age > 20) blastFx.splice(bi, 1);
+                }
+            }
+            done.onclick = function () {
+                if (hasSavedShape && path.length < 10) {
+                    ws.send(JSON.stringify({ t: 'monster', reuse: true })); isReady = true; done.style.display = 'none'; unready.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Ready! Waiting for others...'; return
+                }
+                if (path.length < 10) { document.getElementById('drawStatus').textContent = 'Draw a shape first'; document.getElementById('drawStatus').style.color = '#e66'; return }
+                var s = drawMonster(); if (!s) { document.getElementById('drawStatus').textContent = 'Draw a valid shape'; document.getElementById('drawStatus').style.color = '#e66'; return }
+                hasSavedShape = false; ws.send(JSON.stringify({ t: 'monster', m: s })); isReady = true; done.style.display = 'none'; unready.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Ready! Waiting for others...'
+            };
+            unready.onclick = function () {
+                ws.send(JSON.stringify({ t: 'unready' })); isReady = false; unready.style.display = 'none'; done.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Draw your monster'
+            };
+            clearBtn.onclick = function () {
+                if (isReady) return;
+                path = [];
+                var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H);
+                document.getElementById('drawStatus').textContent = 'Draw your monster'; document.getElementById('drawStatus').style.color = '#888'
+            };
+            function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+            function getXY(e) { var r = c.getBoundingClientRect(), sx = W / r.width, sy = H / r.height; var px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left, py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return { x: clamp(px * sx, 5, W - 5), y: clamp(py * sy, 5, H - 5) } }
+            function onDown(e) { if (isReady) return; var p = getXY(e); path = [p] }
+            function smooth(p) { for (var k = 0; k < 2; k++) { var n = []; for (var i = 0; i < p.length; i++) { var a = p[i - 1] || p[0], b = p[i], cc = p[i + 1] || p[p.length - 1]; n.push({ x: (a.x + b.x * 2 + cc.x) / 4, y: (a.y + b.y * 2 + cc.y) / 4 }) } p = n } return p }
+            function onMove(e) {
+                if (path.length === 0 || isReady) return; var p = getXY(e); path.push(p); var draw = smooth(path.slice()); var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = myColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(draw[0].x, draw[0].y); for (var i = 1; i < draw.length; i++)ctx.lineTo(draw[i].x, draw[i].y); ctx.stroke();
+                if (draw.length > 5) { var d = Math.hypot(draw[0].x - draw[draw.length - 1].x, draw[0].y - draw[draw.length - 1].y); ctx.strokeStyle = d < 50 ? 'rgba(46,204,113,0.5)' : 'rgba(231,76,60,0.3)'; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(draw[draw.length - 1].x, draw[draw.length - 1].y); ctx.lineTo(draw[0].x, draw[0].y); ctx.stroke(); ctx.setLineDash([]) }
+            }
+            function onUp() {
+                if (path.length < 10 || isReady) return; path = smooth(path);
+                var gap = Math.hypot(path[0].x - path[path.length - 1].x, path[0].y - path[path.length - 1].y);
+                if (gap > 5) { var steps = Math.max(2, Math.ceil(gap / 10)); var ex = path[path.length - 1].x, ey = path[path.length - 1].y; for (var i = 1; i <= steps; i++) { var t = i / steps; path.push({ x: ex * (1 - t) + path[0].x * t, y: ey * (1 - t) + path[0].y * t }) } }
+                document.getElementById('drawStatus').textContent = 'Shape ready!'; document.getElementById('drawStatus').style.color = '#2ecc71'; drawMonster()
+            }
+            c.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(e) });
+            c.addEventListener('touchmove', function (e) { e.preventDefault(); onMove(e) });
+            c.addEventListener('touchend', function (e) { e.preventDefault(); if (e.touches.length === 0) onUp() });
+            c.addEventListener('mousedown', onDown);
+            c.addEventListener('mousemove', function (e) { if (e.buttons) onMove(e) });
+            c.addEventListener('mouseup', onUp);
+            blastBtn.onclick = function () {
+                if (blastCooldown > 0 || isDead) return;
+                ws.send(JSON.stringify({ t: 'blast' }));
+                blastCooldown = 10; blastBtn.disabled = true; blastBtn.textContent = 'Blast (10s)';
+                var cd = setInterval(function () { blastCooldown--; if (blastCooldown <= 0) { clearInterval(cd); if (!isDead) { blastBtn.disabled = false; blastBtn.textContent = 'Blast (ready)'; blastBtn.style.background = '#c0392b' } } else { blastBtn.textContent = 'Blast (' + blastCooldown + 's)' } }, 1000)
+            };
+            setInterval(function () { if (arena.style.display === 'flex' && Object.keys(monsters).length) renderArena() }, 16);
+            connect();
+        })();
+    </script>
+</body>
+
+</html>
