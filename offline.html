@@ -479,10 +479,15 @@
                 for (var i = 0; i < floatTexts.length; i++) { var f = floatTexts[i]; ctx.globalAlpha = 1 - f.age / 40; ctx.fillStyle = f.color; ctx.font = 'bold 14px sans-serif'; ctx.fillText(f.text, f.x, f.y - f.age); ctx.globalAlpha = 1 }
 
                 var m = monsters[0];
-                if (m && m.hp > 0) {
+                if (m) {
                     var bBtn = document.getElementById('blastBtn'), aBtn = document.getElementById('abilityBtn');
-                    if (bBtn) bBtn.textContent = 'Blast' + ((blastCooldown > 0) ? ' (' + Math.ceil(blastCooldown / 60) + ')' : '');
-                    if (aBtn) aBtn.textContent = m.ability === 'none' ? 'No Ability' : (m.ability.toUpperCase() + ((m.abilityCooldown > 0) ? ' (' + Math.ceil(m.abilityCooldown / 60) + ')' : ''));
+                    if (m.hp <= 0) {
+                        if (bBtn) bBtn.textContent = 'Dead';
+                        if (aBtn) aBtn.textContent = 'Dead';
+                    } else {
+                        if (bBtn) bBtn.textContent = 'Blast' + ((blastCooldown > 0) ? ' (' + Math.ceil(blastCooldown / 60) + ')' : '');
+                        if (aBtn) aBtn.textContent = m.ability === 'none' ? 'No Ability' : (m.ability.toUpperCase() + ((m.abilityCooldown > 0) ? ' (' + Math.ceil(m.abilityCooldown / 60) + ')' : ''));
+                    }
                 }
             }
 
