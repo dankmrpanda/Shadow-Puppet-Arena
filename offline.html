@@ -154,7 +154,7 @@
         <button id=start1>1 vs 1</button>
         <button id=start3>1 vs 3</button>
         <button id=start5>1 vs 5</button>
-        <p class=hint style="margin-top:20px">Offline Version (Contest Entry)</p>
+        <p class=hint style="margin-top:20px">Offline Version</p>
     </div>
     <div id=ui>
         <p id=drawStatus style="margin:4px;color:#888">Draw your monster</p>
@@ -490,84 +490,93 @@
                     }
                 }
             }
-
-        }
             var isScotty = false;
-        var menu = document.getElementById('menu'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac');
-        var start1 = document.getElementById('start1'), start3 = document.getElementById('start3'), start5 = document.getElementById('start5'), clearBtn = document.getElementById('clear'), doneBtn = document.getElementById('done'), restartBtn = document.getElementById('restart');
-        var blastBtn = document.getElementById('blastBtn'), abilityBtn = document.getElementById('abilityBtn'), loadScottyBtn = document.getElementById('loadScotty');
+            var menu = document.getElementById('menu'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac');
+            var start1 = document.getElementById('start1'), start3 = document.getElementById('start3'), start5 = document.getElementById('start5'), clearBtn = document.getElementById('clear'), doneBtn = document.getElementById('done'), restartBtn = document.getElementById('restart');
+            var blastBtn = document.getElementById('blastBtn'), abilityBtn = document.getElementById('abilityBtn'), loadScottyBtn = document.getElementById('loadScotty');
 
-        function startGame(nb) { numBots = nb; menu.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; path = []; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300) }
-        if (start1) start1.onclick = function () { startGame(1) };
-        if (start3) start3.onclick = function () { startGame(3) };
-        if (start5) start5.onclick = function () { startGame(5) };
+            function startGame(nb) { numBots = nb; menu.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; path = []; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300) }
+            if (start1) start1.onclick = function () { startGame(1) };
+            if (start3) start3.onclick = function () { startGame(3) };
+            if (start5) start5.onclick = function () { startGame(5) };
 
-        function getXY(e) { var r = c.getBoundingClientRect(), sx = 300 / r.width, sy = 300 / r.height, px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left, py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return { x: clamp(px * sx, 5, 295), y: clamp(py * sy, 5, 295) } }
-        function smooth(p) { for (var k = 0; k < 2; k++) { var n = []; for (var i = 0; i < p.length; i++) { var a = p[i - 1] || p[0], b = p[i], cc = p[i + 1] || p[p.length - 1]; n.push({ x: (a.x + b.x * 2 + cc.x) / 4, y: (a.y + b.y * 2 + cc.y) / 4 }) } p = n } return p }
-        function onDown(e) { isScotty = false; var p = getXY(e); path = [p] }
-        function onMove(e) { if (!path.length) return; var p = getXY(e); path.push(p); var d = smooth(path.slice()), ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); ctx.strokeStyle = myColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(d[0].x, d[0].y); for (var i = 1; i < d.length; i++)ctx.lineTo(d[i].x, d[i].y); ctx.stroke() }
-        function onUp() { if (path.length < 10) return; path = smooth(path); var g = Math.hypot(path[0].x - path[path.length - 1].x, path[0].y - path[path.length - 1].y); if (g > 5) { var s = Math.ceil(g / 10), ex = path[path.length - 1].x, ey = path[path.length - 1].y; for (var i = 1; i <= s; i++) { var t = i / s; path.push({ x: ex * (1 - t) + path[0].x * t, y: ey * (1 - t) + path[0].y * t }) } } path.push({ x: path[0].x, y: path[0].y }); document.getElementById('drawStatus').textContent = 'Shape ready!'; document.getElementById('drawStatus').style.color = '#2ecc71'; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y); for (var i = 1; i < path.length; i++)ctx.lineTo(path[i].x, path[i].y); ctx.fill() }
+            function getXY(e) { var r = c.getBoundingClientRect(), sx = 300 / r.width, sy = 300 / r.height, px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left, py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return { x: clamp(px * sx, 5, 295), y: clamp(py * sy, 5, 295) } }
+            function smooth(p) { for (var k = 0; k < 2; k++) { var n = []; for (var i = 0; i < p.length; i++) { var a = p[i - 1] || p[0], b = p[i], cc = p[i + 1] || p[p.length - 1]; n.push({ x: (a.x + b.x * 2 + cc.x) / 4, y: (a.y + b.y * 2 + cc.y) / 4 }) } p = n } return p }
+            function onDown(e) { isScotty = false; var p = getXY(e); path = [p] }
+            function onMove(e) { if (!path.length) return; var p = getXY(e); path.push(p); var d = smooth(path.slice()), ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); ctx.strokeStyle = myColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(d[0].x, d[0].y); for (var i = 1; i < d.length; i++)ctx.lineTo(d[i].x, d[i].y); ctx.stroke() }
+            function onUp() { if (path.length < 10) return; path = smooth(path); var g = Math.hypot(path[0].x - path[path.length - 1].x, path[0].y - path[path.length - 1].y); if (g > 5) { var s = Math.ceil(g / 10), ex = path[path.length - 1].x, ey = path[path.length - 1].y; for (var i = 1; i <= s; i++) { var t = i / s; path.push({ x: ex * (1 - t) + path[0].x * t, y: ey * (1 - t) + path[0].y * t }) } } path.push({ x: path[0].x, y: path[0].y }); document.getElementById('drawStatus').textContent = 'Shape ready!'; document.getElementById('drawStatus').style.color = '#2ecc71'; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y); for (var i = 1; i < path.length; i++)ctx.lineTo(path[i].x, path[i].y); ctx.fill() }
 
-        c.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(e) }); c.addEventListener('touchmove', function (e) { e.preventDefault(); onMove(e) }); c.addEventListener('touchend', function (e) { e.preventDefault(); onUp() });
-        c.addEventListener('mousedown', onDown); c.addEventListener('mousemove', function (e) { if (e.buttons) onMove(e) }); c.addEventListener('mouseup', onUp);
-        clearBtn.onclick = function () { path = []; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); document.getElementById('drawStatus').textContent = 'Draw your monster'; document.getElementById('drawStatus').style.color = '#888' };
-        if (loadScottyBtn) loadScottyBtn.onclick = function () {
-            path = [
-                { x: 270, y: 100 }, { x: 270, y: 140 }, { x: 240, y: 140 }, { x: 220, y: 160 }, { x: 220, y: 230 },
-                { x: 200, y: 230 }, { x: 180, y: 190 }, { x: 120, y: 190 }, { x: 100, y: 230 }, { x: 60, y: 230 },
-                { x: 70, y: 160 }, { x: 50, y: 100 }, { x: 60, y: 80 }, { x: 70, y: 140 }, { x: 180, y: 140 },
-                { x: 180, y: 70 }, { x: 200, y: 40 }, { x: 220, y: 70 }, { x: 240, y: 70 }, { x: 270, y: 100 }
-            ];
-            path = smooth(path); path.push({ x: path[0].x, y: path[0].y });
-            isScotty = true;
-            var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300);
-            ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y); for (var i = 1; i < path.length; i++)ctx.lineTo(path[i].x, path[i].y); ctx.fill();
-            document.getElementById('drawStatus').textContent = 'Scotty Loaded!'; document.getElementById('drawStatus').style.color = '#c0392b';
-        };
+            c.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(e) }); c.addEventListener('touchmove', function (e) { e.preventDefault(); onMove(e) }); c.addEventListener('touchend', function (e) { e.preventDefault(); onUp() });
+            c.addEventListener('mousedown', onDown); c.addEventListener('mousemove', function (e) { if (e.buttons) onMove(e) }); c.addEventListener('mouseup', onUp);
+            clearBtn.onclick = function () { path = []; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); document.getElementById('drawStatus').textContent = 'Draw your monster'; document.getElementById('drawStatus').style.color = '#888' };
+            if (loadScottyBtn) loadScottyBtn.onclick = function () {
+                path = [
+                    { x: 280, y: 130 }, // Nose Tip
+                    { x: 280, y: 160 }, { x: 260, y: 190 }, { x: 245, y: 170 }, // Beard
+                    { x: 230, y: 200 }, // Chest
+                    { x: 230, y: 260 }, { x: 210, y: 260 }, { x: 210, y: 220 }, // Front Leg
+                    { x: 190, y: 220 }, { x: 130, y: 220 }, // Belly
+                    { x: 120, y: 260 }, { x: 90, y: 260 }, { x: 90, y: 210 }, // Back Leg
+                    { x: 60, y: 180 }, // Rump
+                    { x: 50, y: 130 }, { x: 45, y: 80 }, { x: 65, y: 120 }, // Tail
+                    { x: 90, y: 130 }, { x: 190, y: 130 }, // Back
+                    { x: 195, y: 70 }, { x: 205, y: 40 }, { x: 215, y: 70 }, // Ear Back
+                    { x: 220, y: 70 }, { x: 230, y: 40 }, { x: 240, y: 70 }, // Ear Front
+                    { x: 250, y: 90 }, // Forehead
+                    { x: 255, y: 110 }, // Stop
+                    { x: 280, y: 110 }  // Snout Top
+                ];
+                // Skip smoothing
+                path.push({ x: path[0].x, y: path[0].y });
+                isScotty = true;
+                var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300);
+                ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y); for (var i = 1; i < path.length; i++)ctx.lineTo(path[i].x, path[i].y); ctx.fill();
+                document.getElementById('drawStatus').textContent = 'Scotty Loaded!'; document.getElementById('drawStatus').style.color = '#c0392b';
+            };
 
-        function genBot(cx, cy) {
-            var p = [], r = rand(30, 70), pts = Math.floor(rand(5, 12));
-            for (var i = 0; i < pts; i++) { var a = i / pts * 6.28, rr = r + rand(-15, 25); p.push([Math.round((cx + Math.cos(a) * rr) / 12), Math.round((cy + Math.sin(a) * rr) / 12)]) }
-            return p
-        }
-
-        doneBtn.onclick = function () {
-            if (path.length < 10) return;
-            var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < path.length; i++) { mx = Math.min(mx, path[i].x); my = Math.min(my, path[i].y); Mx = Math.max(Mx, path[i].x); My = Math.max(My, path[i].y) }
-            var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
-            var p = [], ns = Math.min(path.length, 30); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (path.length - 1) / (ns - 1)); p.push([Math.round((path[j].x * sc + ox) / 12), Math.round((path[j].y * sc + oy) / 12)]) }
-
-            ui.style.display = 'none'; arena.style.display = 'flex'; logEl.innerHTML = '';
-            monsters = {}; packs = []; powerups = []; hazards = []; particles = []; blastFx = []; floatTexts = []; activeBlasts = [];
-            bounds = [0, 0, W, H]; tickCount = 0; suddenDeath = false; blastCooldown = 0;
-
-            monsters[0] = initMonster(0, p, myColor, 'You', false);
-            for (var i = 0; i < numBots; i++) monsters[i + 1] = initMonster(i + 1, genBot(150, 150), aiColors[i % 5], 'Bot' + (i + 1), true);
-
-            spawnPack(); spawnPack();
-            addLog('Battle Start! ' + numBots + ' bots vs You!');
-
-            if (gameLoop) clearInterval(gameLoop);
-            gameLoop = setInterval(update, 16);
-        };
-
-        var blastCooldown = 0, keys = {};
-        document.addEventListener('keydown', function (e) { keys[e.key] = true }); document.addEventListener('keyup', function (e) { keys[e.key] = false });
-        if (blastBtn) blastBtn.onclick = function () { if (!monsters[0] || blastCooldown > 0) return; blast(0); blastCooldown = 600 };
-        if (abilityBtn) abilityBtn.onclick = function () { if (!monsters[0]) return; useAbility(0) };
-
-        setInterval(function () {
-            if (monsters[0] && monsters[0].hp > 0 && !gameLoop) return;
-            if (blastCooldown > 0) blastCooldown--;
-            if (monsters[0] && monsters[0].hp > 0) {
-                var m = monsters[0], sp = m.speed;
-                if (keys.ArrowUp || keys.w || keys.W) m.vy -= sp * 0.15; if (keys.ArrowDown || keys.s || keys.S) m.vy += sp * 0.15;
-                if (keys.ArrowLeft || keys.a || keys.A) m.vx -= sp * 0.15; if (keys.ArrowRight || keys.d || keys.D) m.vx += sp * 0.15;
-                if (keys[' '] && blastCooldown <= 0) blastBtn.click();
-                if (keys.Shift || keys.e || keys.E) abilityBtn.click();
+            function genBot(cx, cy) {
+                var p = [], r = rand(30, 70), pts = Math.floor(rand(5, 12));
+                for (var i = 0; i < pts; i++) { var a = i / pts * 6.28, rr = r + rand(-15, 25); p.push([Math.round((cx + Math.cos(a) * rr) / 12), Math.round((cy + Math.sin(a) * rr) / 12)]) }
+                return p
             }
-        }, 16);
-        if (restartBtn) restartBtn.onclick = function () { arena.style.display = 'none'; menu.style.display = 'block'; path = []; };
+
+            doneBtn.onclick = function () {
+                if (path.length < 10) return;
+                var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < path.length; i++) { mx = Math.min(mx, path[i].x); my = Math.min(my, path[i].y); Mx = Math.max(Mx, path[i].x); My = Math.max(My, path[i].y) }
+                var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
+                var p = [], ns = Math.min(path.length, 30); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (path.length - 1) / (ns - 1)); p.push([Math.round((path[j].x * sc + ox) / 12), Math.round((path[j].y * sc + oy) / 12)]) }
+
+                ui.style.display = 'none'; arena.style.display = 'flex'; logEl.innerHTML = '';
+                monsters = {}; packs = []; powerups = []; hazards = []; particles = []; blastFx = []; floatTexts = []; activeBlasts = [];
+                bounds = [0, 0, W, H]; tickCount = 0; suddenDeath = false; blastCooldown = 0;
+
+                monsters[0] = initMonster(0, p, myColor, 'You', false);
+                for (var i = 0; i < numBots; i++) monsters[i + 1] = initMonster(i + 1, genBot(150, 150), aiColors[i % 5], 'Bot' + (i + 1), true);
+
+                spawnPack(); spawnPack();
+                addLog('Battle Start! ' + numBots + ' bots vs You!');
+
+                if (gameLoop) clearInterval(gameLoop);
+                gameLoop = setInterval(update, 16);
+            };
+
+            var blastCooldown = 0, keys = {};
+            document.addEventListener('keydown', function (e) { keys[e.key] = true }); document.addEventListener('keyup', function (e) { keys[e.key] = false });
+            if (blastBtn) blastBtn.onclick = function () { if (!monsters[0] || blastCooldown > 0) return; blast(0); blastCooldown = 600 };
+            if (abilityBtn) abilityBtn.onclick = function () { if (!monsters[0]) return; useAbility(0) };
+
+            setInterval(function () {
+                if (monsters[0] && monsters[0].hp > 0 && !gameLoop) return;
+                if (blastCooldown > 0) blastCooldown--;
+                if (monsters[0] && monsters[0].hp > 0) {
+                    var m = monsters[0], sp = m.speed;
+                    if (keys.ArrowUp || keys.w || keys.W) m.vy -= sp * 0.15; if (keys.ArrowDown || keys.s || keys.S) m.vy += sp * 0.15;
+                    if (keys.ArrowLeft || keys.a || keys.A) m.vx -= sp * 0.15; if (keys.ArrowRight || keys.d || keys.D) m.vx += sp * 0.15;
+                    if (keys[' '] && blastCooldown <= 0) blastBtn.click();
+                    if (keys.Shift || keys.e || keys.E) abilityBtn.click();
+                }
+            }, 16);
+            if (restartBtn) restartBtn.onclick = function () { arena.style.display = 'none'; menu.style.display = 'block'; path = []; };
         });
     </script>
 </body>

@@ -389,19 +389,22 @@
                 if (isReady) return;
                 // Scotty dog path (approximate profile)
                 path = [
-                    { x: 270, y: 100 }, { x: 270, y: 140 }, { x: 240, y: 140 }, // Beard
-                    { x: 220, y: 160 }, { x: 220, y: 230 }, // Chest/FrontLeg
-                    { x: 200, y: 230 }, { x: 180, y: 190 }, // FrontLegBack
-                    { x: 120, y: 190 }, { x: 100, y: 230 }, // Belly/BackLeg
-                    { x: 60, y: 230 }, { x: 70, y: 160 }, // BackLegBack/Rump
-                    { x: 50, y: 100 }, { x: 60, y: 80 }, { x: 70, y: 140 }, // Tail
-                    { x: 180, y: 140 }, // Back
-                    { x: 180, y: 70 }, { x: 200, y: 40 }, { x: 220, y: 70 }, // Ear 1
-                    { x: 240, y: 70 }, // Forehead
-                    { x: 270, y: 100 } // Nose connect
+                    { x: 280, y: 130 }, // Nose Tip
+                    { x: 280, y: 160 }, { x: 260, y: 190 }, { x: 245, y: 170 }, // Beard
+                    { x: 230, y: 200 }, // Chest
+                    { x: 230, y: 260 }, { x: 210, y: 260 }, { x: 210, y: 220 }, // Front Leg
+                    { x: 190, y: 220 }, { x: 130, y: 220 }, // Belly
+                    { x: 120, y: 260 }, { x: 90, y: 260 }, { x: 90, y: 210 }, // Back Leg
+                    { x: 60, y: 180 }, // Rump
+                    { x: 50, y: 130 }, { x: 45, y: 80 }, { x: 65, y: 120 }, // Tail
+                    { x: 90, y: 130 }, { x: 190, y: 130 }, // Back
+                    { x: 195, y: 70 }, { x: 205, y: 40 }, { x: 215, y: 70 }, // Ear Back
+                    { x: 220, y: 70 }, { x: 230, y: 40 }, { x: 240, y: 70 }, // Ear Front
+                    { x: 250, y: 90 }, // Forehead
+                    { x: 255, y: 110 }, // Stop
+                    { x: 280, y: 110 }  // Snout Top
                 ];
-                // Smooth slightly
-                path = smooth(path);
+                // Skip smoothing for defined features
                 path.push({ x: path[0].x, y: path[0].y }); // Close
                 isScotty = true;
                 document.getElementById('mname').value = 'Scotty';
