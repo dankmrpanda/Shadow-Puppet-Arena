@@ -31,9 +31,12 @@ function startArena(roomCode){
   }
 }
 function verts(m){
-  const s=m.size/40,o=[];
+  const s=m.size/40;let cx=0,cy=0;
+  for(let i=0;i<m.path.length;i++){cx+=m.path[i][0]*12;cy+=m.path[i][1]*12}
+  cx/=m.path.length;cy/=m.path.length;
+  const o=[];
   for(let i=0;i<m.path.length;i++)
-    o.push([m.x+(m.path[i][0]*12-120)*s,m.y+(m.path[i][1]*12-120)*s]);
+    o.push([m.x+(m.path[i][0]*12-cx)*s,m.y+(m.path[i][1]*12-cy)*s]);
   return o;
 }
 function ptInPoly(px,py,v){
@@ -63,6 +66,14 @@ function tick(roomCode){
   if(r.tick%125===0&&(r.arenaR-r.arenaL)>200){
     r.arenaL+=5;r.arenaT+=4;r.arenaR-=5;r.arenaB-=4;
     logs.push('Arena shrinks!');
+    // Push monsters inward if border crossed them
+    for(const id of Object.keys(r.monsters)){
+      const m=r.monsters[id],pad=m.size;
+      if(m.x<r.arenaL+pad){m.x=r.arenaL+pad;m.vx=Math.abs(m.vx)}
+      if(m.x>r.arenaR-pad){m.x=r.arenaR-pad;m.vx=-Math.abs(m.vx)}
+      if(m.y<r.arenaT+pad){m.y=r.arenaT+pad;m.vy=Math.abs(m.vy)}
+      if(m.y>r.arenaB-pad){m.y=r.arenaB-pad;m.vy=-Math.abs(m.vy)}
+    }
   }
   // Tick down iframes
   for(const id of Object.keys(r.monsters))if(r.monsters[id].iframes>0)r.monsters[id].iframes--;
