@@ -41,13 +41,10 @@ function spawnHazard(r) {
 
 const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
 
-// Detect shape ability based on stats
+// Random ability assignment
+const ABILITIES = ['dash', 'block', 'absorb'];
 function detectAbility(m) {
-  // spikeBurst removed
-  if (m.c <= 1 && m.s > 0.7) return 'absorb'; // Circle - heal on hit
-  if (m.l >= 3) return 'dash'; // Snake/tentacles - speed burst
-  if (m.c >= 4) return 'block'; // Square/Star shape - invincibility
-  return 'none';
+  return ABILITIES[Math.floor(Math.random() * ABILITIES.length)];
 }
 
 function startArena(roomCode) {
@@ -147,27 +144,22 @@ function tick(roomCode) {
     for (const id of Object.keys(r.monsters)) { var m = r.monsters[id]; m.baseSpeed = Math.min(1.5, m.baseSpeed + 0.03) }
     logs.push('Speed up!');
   }
-  // Shrink arena - increments grow over time, much faster in 1v1
+  // Shrink arena - percentage-based, scales with elapsed time
   var aliveCount = Object.keys(r.monsters).length;
   var is1v1 = aliveCount === 2;
-  // Normal: every 900 ticks (~14s). 1v1: every 300 ticks (~5s) by percentage
-  var shrinkInterval = is1v1 ? 300 : 900;
-  if (r.tick % shrinkInterval === 0 && (r.arenaR - r.arenaL) > 180) {
+  var elapsedSec = r.tick / 62.5; // ~62.5 ticks per second at 16ms
+  // Base interval shrinks over time: starts at 14s, drops to 6s by 2min
+  var baseInterval = is1v1 ? 300 : Math.max(375, Math.round(900 - elapsedSec * 3));
+  if (r.tick % baseInterval === 0 && r.tick > 0 && (r.arenaR - r.arenaL) > 180) {
     var currentW = r.arenaR - r.arenaL;
     var currentH = r.arenaB - r.arenaT;
-    if (is1v1) {
-      // Percentage-based shrink: 8% of current dimensions each time
-      var shrinkX = Math.max(6, Math.round(currentW * 0.08));
-      var shrinkY = Math.max(5, Math.round(currentH * 0.08));
-      r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
-      logs.push('1v1! Arena closing fast!');
-    } else {
-      var phase = Math.floor(r.tick / 900);
-      var shrinkX = Math.min(12, 4 + phase);
-      var shrinkY = Math.min(10, 3 + Math.floor(phase * 0.7));
-      r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
-      logs.push('Arena shrinks!');
-    }
+    // Shrink percentage scales with time: 3% early -> 10% late, 1v1 even faster
+    var pct = is1v1 ? Math.min(0.12, 0.06 + elapsedSec * 0.0005) : Math.min(0.10, 0.03 + elapsedSec * 0.0004);
+    var shrinkX = Math.max(4, Math.round(currentW * pct));
+    var shrinkY = Math.max(3, Math.round(currentH * pct));
+    r.arenaL += shrinkX; r.arenaT += shrinkY; r.arenaR -= shrinkX; r.arenaB -= shrinkY;
+    if (is1v1) logs.push('1v1! Arena closing fast!');
+    else logs.push('Arena shrinks!');
     if (r.arenaR - r.arenaL < 180) { r.arenaL = (r.arenaL + r.arenaR) / 2 - 90; r.arenaR = r.arenaL + 180 }
     if (r.arenaB - r.arenaT < 130) { r.arenaT = (r.arenaT + r.arenaB) / 2 - 65; r.arenaB = r.arenaT + 130 }
     for (const id of Object.keys(r.monsters)) clampBounds(r.monsters[id], r);
@@ -231,10 +223,11 @@ function tick(roomCode) {
         logs.push(m.name + ' struck by lightning!');
       }
     }
-    r.lightningStrike = { x: lw.x, y: lw.y };
+    r.lightningStrike = { x: lw.x, y: lw.y, tick: r.tick };
     r.lightningWarning = null;
   }
-  if (r.lightningStrike && r.tick % 10 === 0) r.lightningStrike = null;
+  // Lightning strike lasts 20 ticks (~320ms)
+  if (r.lightningStrike && r.tick - r.lightningStrike.tick > 20) r.lightningStrike = null;
 
   // Sudden death - when arena is minimum size
   if ((r.arenaR - r.arenaL) <= 180 && (r.arenaB - r.arenaT) <= 130 && !r.suddenDeath) {

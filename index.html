@@ -215,7 +215,9 @@
                 <div id=statAbilityRule style="text-align:center;color:#666;font-size:10px;margin-top:2px"></div>
             </div>
             <div style="margin-top:4px;padding-top:4px;border-top:1px solid #222;color:#666;font-size:9px;text-align:center">
-                ⚡ Dash: 3+ protrusions &nbsp;|&nbsp; 🛡 Block: 4+ corners &nbsp;|&nbsp; 💚 Absorb: ≤1 corner + high symmetry
+                🎲 Ability is random: ⚡ Dash (speed burst) &nbsp;|
+                🛡 Block (invincible 4s) &nbsp;|
+                💚 Absorb (reflect hits &amp; heal 2s)
             </div>
         </div>
         <p id=drawStatus style=margin:4px>Draw your monster</p><button id=loadPrev
@@ -350,17 +352,11 @@
                 document.getElementById('statCorners').textContent = stats.c + ' → ' + Math.min(stats.c, 5) + ' spikes';
                 document.getElementById('statSym').textContent = (Math.round(stats.s * 100)) + '%';
                 document.getElementById('statLegs').textContent = stats.l + ' → ' + (1.0 + Math.min(stats.l * 0.15, 0.5)).toFixed(2) + 'x speed';
-                var ab = 'none';
-                if (stats.c <= 1 && stats.s > 0.7) ab = 'absorb';
-                else if (stats.l >= 3) ab = 'dash';
-                else if (stats.c >= 4) ab = 'block';
-                var abIcons = { dash: '⚡ Dash', block: '🛡 Block', absorb: '💚 Absorb', none: '❌ None' };
-                var abDescs = { dash: 'Speed burst (3+ protrusions detected)', block: 'Invincible 4s (4+ corners detected)', absorb: 'Reflect damage & heal 2s (\u22641 corner + >70% symmetry)', none: 'No special ability' };
-                document.getElementById('statAbility').textContent = abIcons[ab] || 'None';
-                document.getElementById('statAbilityRule').textContent = abDescs[ab];
+                document.getElementById('statAbility').textContent = '🎲 Random';
+                document.getElementById('statAbilityRule').textContent = 'Randomly assigned: Dash, Block, or Absorb';
                 return stats
             }
-            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 4s', absorb: 'Reflect dmg 2s', none: '' };
+            var abilityDescs = { dash: 'Speed burst forward', block: 'Invincible 4s', absorb: 'Reflect & heal 2s', none: '' };
             var abilityIcons = { dash: '⚡', block: '🛡', absorb: '💚', none: '' };
             var puLabels = { speed: '2x SPEED', shield: 'SHIELD', damage: '2x DMG', ghost: 'PHASE' };
             function renderArena() {
@@ -395,10 +391,43 @@
                 if (lightningWarning) {
                     ctx.strokeStyle = 'rgba(255,255,0,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
                     ctx.beginPath(); ctx.arc(lightningWarning.x, lightningWarning.y, 60, 0, Math.PI * 2); ctx.stroke();
-                    ctx.setLineDash([]); ctx.fillStyle = '#ff0'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡', lightningWarning.x, lightningWarning.y);
+                    ctx.setLineDash([]);
+                    // Pulsing warning circle
+                    var pulse = 0.3 + 0.3 * Math.sin(Date.now() / 100);
+                    ctx.fillStyle = 'rgba(255,255,0,' + pulse + ')'; ctx.beginPath(); ctx.arc(lightningWarning.x, lightningWarning.y, 60, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#ff0'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('⚡', lightningWarning.x, lightningWarning.y);
+                    ctx.fillStyle = '#ff0'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('WARNING', lightningWarning.x, lightningWarning.y + 25);
                 }
                 if (lightningStrike) {
-                    ctx.fillStyle = 'rgba(255,255,200,0.8)'; ctx.beginPath(); ctx.arc(lightningStrike.x, lightningStrike.y, 60, 0, Math.PI * 2); ctx.fill();
+                    // Bright flash
+                    ctx.fillStyle = 'rgba(255,255,200,0.6)'; ctx.beginPath(); ctx.arc(lightningStrike.x, lightningStrike.y, 70, 0, Math.PI * 2); ctx.fill();
+                    // Lightning bolt from top of arena to strike point
+                    ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.shadowColor = '#ff0'; ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    var bx = lightningStrike.x, by = lightningStrike.y;
+                    var topY = bounds[1];
+                    ctx.moveTo(bx + (Math.random() - 0.5) * 10, topY);
+                    var segments = 6;
+                    for (var si = 1; si <= segments; si++) {
+                        var t = si / segments;
+                        var lx = bx + (Math.random() - 0.5) * 40 * (1 - t * 0.7);
+                        var ly = topY + (by - topY) * t;
+                        ctx.lineTo(lx, ly);
+                    }
+                    ctx.stroke();
+                    // Second thinner bolt
+                    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,100,0.8)';
+                    ctx.beginPath(); ctx.moveTo(bx + (Math.random() - 0.5) * 15, topY);
+                    for (var si = 1; si <= segments; si++) {
+                        var t = si / segments;
+                        ctx.lineTo(bx + (Math.random() - 0.5) * 50 * (1 - t * 0.5), topY + (by - topY) * t);
+                    }
+                    ctx.stroke(); ctx.restore();
+                    // Impact glow
+                    ctx.fillStyle = 'rgba(255,255,0,0.4)'; ctx.beginPath(); ctx.arc(bx, by, 50, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('⚡ ZAP!', bx, by);
                 }
 
                 // Health packs
