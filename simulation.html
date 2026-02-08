@@ -276,6 +276,8 @@
             }
 
             var lightningWarning = null, lightningStrike = null;
+            var ARENA_EVENTS = ['meteor_shower', 'shockwave', 'eclipse', 'gravity_surge', 'frost_nova', 'inferno'];
+            var arenaEvent = null, arenaEventWarning = null, meteors = [], screenShake = { x: 0, y: 0, intensity: 0, decay: 0.9 };
             function spawnPack() {
                 var m = 30;
                 packs.push({ x: rand(bounds[0] + m, bounds[2] - m), y: rand(bounds[1] + m, bounds[3] - m), hp: Math.floor(rand(15, 35)) })
@@ -376,6 +378,76 @@
                     lightningWarning = null
                 }
                 if (lightningStrike) { lightningStrike.age++; if (lightningStrike.age > 30) lightningStrike = null; }
+
+                // Arena-wide events
+                if (!arenaEvent && !arenaEventWarning && tickCount > 300 && tickCount % 437 === 0) {
+                    var evType = ARENA_EVENTS[Math.floor(Math.random() * ARENA_EVENTS.length)];
+                    arenaEventWarning = { type: evType, age: 0, duration: 120 };
+                    addLog('⚠️ ' + evType.replace(/_/g, ' ').toUpperCase() + ' INCOMING!');
+                }
+                if (arenaEventWarning) {
+                    arenaEventWarning.age++;
+                    if (arenaEventWarning.age >= arenaEventWarning.duration) {
+                        var et = arenaEventWarning.type;
+                        var dur = et === 'shockwave' ? 60 : et === 'eclipse' ? 300 : et === 'gravity_surge' ? 150 : et === 'frost_nova' ? 240 : et === 'inferno' ? 200 : 180;
+                        arenaEvent = { type: et, age: 0, duration: dur };
+                        if (et === 'shockwave') { screenShake = { x: 0, y: 0, intensity: 14, decay: 0.91 }; addLog('💥 SHOCKWAVE!'); }
+                        else if (et === 'eclipse') addLog('🌑 ECLIPSE! Darkness falls!');
+                        else if (et === 'gravity_surge') addLog('🌀 GRAVITY SURGE!');
+                        else if (et === 'frost_nova') addLog('❄️ FROST NOVA! Everything freezes!');
+                        else if (et === 'inferno') addLog('🔥 INFERNO! The arena burns!');
+                        else if (et === 'meteor_shower') addLog('☄️ METEOR SHOWER!');
+                        arenaEventWarning = null;
+                    }
+                }
+                if (arenaEvent) {
+                    arenaEvent.age++;
+                    var ae = arenaEvent;
+                    if (ae.type === 'meteor_shower' && ae.age % 12 === 0) {
+                        var mx2 = rand(bounds[0] + 20, bounds[2] - 20);
+                        meteors.push({ x: mx2 - rand(80, 200), y: bounds[1] - 40, tx: mx2, ty: rand(bounds[1] + 40, bounds[3] - 40), age: 0, maxAge: 30, hit: false });
+                    }
+                    if (ae.type === 'shockwave') {
+                        var swProg = ae.age / ae.duration, waveR = swProg * Math.max(W, H) * 0.8, swForce = Math.max(0.5, 3 * (1 - swProg));
+                        for (var id in monsters) {
+                            var m2 = monsters[id], cx2 = (bounds[0] + bounds[2]) / 2, cy2 = (bounds[1] + bounds[3]) / 2;
+                            var dd = Math.hypot(m2.x - cx2, m2.y - cy2) || 1;
+                            if (Math.abs(dd - waveR) < 60) { m2.vx += (m2.x - cx2) / dd * swForce; m2.vy += (m2.y - cy2) / dd * swForce; }
+                            if (ae.age === 1 && !m2.effects.shield) { m2.hp -= 12; floatTexts.push({ x: m2.x, y: m2.y - 25, text: '-12', color: '#fff', age: 0 }); }
+                        }
+                    }
+                    if (ae.type === 'eclipse' && ae.age % 40 === 0) {
+                        for (var id in monsters) { if (!monsters[id].effects.shield) { monsters[id].hp -= 3; floatTexts.push({ x: monsters[id].x, y: monsters[id].y - 20, text: '-3', color: '#a040ff', age: 0 }); } }
+                    }
+                    if (ae.type === 'gravity_surge') {
+                        var gcx = (bounds[0] + bounds[2]) / 2, gcy = (bounds[1] + bounds[3]) / 2, gForce = 0.25 + Math.sin(ae.age * 0.05) * 0.15;
+                        for (var id in monsters) { var m3 = monsters[id], gd = Math.hypot(m3.x - gcx, m3.y - gcy) || 1; m3.vx += (gcx - m3.x) / gd * gForce; m3.vy += (gcy - m3.y) / gd * gForce; }
+                        if (ae.age % 50 === 0) { for (var id in monsters) { if (!monsters[id].effects.shield && Math.hypot(monsters[id].x - gcx, monsters[id].y - gcy) < 80) { monsters[id].hp -= 5; floatTexts.push({ x: monsters[id].x, y: monsters[id].y - 20, text: '-5', color: '#c0f', age: 0 }); } } }
+                    }
+                    if (ae.type === 'frost_nova') {
+                        for (var id in monsters) { monsters[id].speed = Math.max(MIN_SPEED * 0.3, monsters[id].speed * 0.5); monsters[id].vx *= 0.92; monsters[id].vy *= 0.92; }
+                        if (ae.age % 60 === 0) { for (var id in monsters) { if (!monsters[id].effects.shield) { monsters[id].hp -= 2; floatTexts.push({ x: monsters[id].x, y: monsters[id].y - 20, text: '-2', color: '#4af', age: 0 }); } } }
+                    }
+                    if (ae.type === 'inferno') {
+                        if (ae.age % 25 === 0) { for (var id in monsters) { if (!monsters[id].effects.shield) { monsters[id].hp -= 4; floatTexts.push({ x: monsters[id].x, y: monsters[id].y - 20, text: '-4', color: '#f80', age: 0 }); } } }
+                        for (var id in monsters) { monsters[id].vx += (Math.random() - 0.5) * 0.3; monsters[id].vy -= Math.random() * 0.15; }
+                    }
+                    if (ae.age >= ae.duration) { arenaEvent = null; screenShake = { x: 0, y: 0, intensity: 0, decay: 0.9 }; }
+                }
+                // Update meteors
+                for (var mi = meteors.length - 1; mi >= 0; mi--) {
+                    var mt = meteors[mi]; mt.age++;
+                    mt.x += (mt.tx - mt.x) * 0.15; mt.y += (mt.ty - mt.y) * 0.15;
+                    if (mt.age >= mt.maxAge && !mt.hit) {
+                        mt.hit = true;
+                        for (var id in monsters) { var m4 = monsters[id], md = Math.hypot(m4.x - mt.tx, m4.y - mt.ty); if (md < 70 && !m4.effects.shield) { var mdmg = Math.round(Math.max(5, 15 - md * 0.15)); m4.hp -= mdmg; floatTexts.push({ x: m4.x, y: m4.y - 25, text: '-' + mdmg, color: '#fa0', age: 0 }); var kd = md || 1; m4.vx += (m4.x - mt.tx) / kd * 3; m4.vy += (m4.y - mt.ty) / kd * 3; } }
+                        for (var pi3 = 0; pi3 < 16; pi3++) { var pa3 = Math.PI * 2 * pi3 / 16; particles.push({ x: mt.tx, y: mt.ty, vx: Math.cos(pa3) * (2 + Math.random() * 3), vy: Math.sin(pa3) * (2 + Math.random() * 3), color: ['#f80', '#fa0', '#ff0', '#f00'][Math.floor(Math.random() * 4)], age: 0 }); }
+                        blastFx.push({ x: mt.tx, y: mt.ty, age: 0 });
+                        screenShake = { x: 0, y: 0, intensity: 7, decay: 0.87 };
+                    }
+                    if (mt.age > mt.maxAge + 20) meteors.splice(mi, 1);
+                }
+                if (screenShake.intensity > 0.5) { screenShake.x = (Math.random() - 0.5) * screenShake.intensity; screenShake.y = (Math.random() - 0.5) * screenShake.intensity; screenShake.intensity *= screenShake.decay; } else { screenShake.x = 0; screenShake.y = 0; screenShake.intensity = 0; }
 
                 if ((bounds[2] - bounds[0]) <= 180 && !suddenDeath) { suddenDeath = true; addLog('⚠️ SUDDEN DEATH!') }
                 if (suddenDeath && tickCount % 40 === 0) for (var id in monsters) if (!monsters[id].effects.shield) { monsters[id].hp -= 4; floatTexts.push({ x: monsters[id].x, y: monsters[id].y - 15, text: '-4', color: '#a00', age: 0 }) }
@@ -526,17 +598,19 @@
 
             function useAbility(id) {
                 var m = monsters[id]; if (!m || m.hp <= 0 || m.ability === 'none' || m.abilityCooldown > 0) return;
-                m.abilityCooldown = 187; // 3 second cooldown
+                m.abilityCooldown = m.ability === 'block' ? 625 : 187; // block=10s, others=3s
                 if (m.ability === 'dash') {
                     m.effects.speed = 180; var v = Math.hypot(m.vx, m.vy) || 1; m.vx = m.vx / v * 4; m.vy = m.vy / v * 4;
                     floatTexts.push({ x: m.x, y: m.y - 30, text: 'DASH!', color: '#0ff', age: 0 })
                 } else if (m.ability === 'block') {
-                    m.effects.shield = 240; floatTexts.push({ x: m.x, y: m.y - 30, text: 'BLOCK!', color: '#88f', age: 0 })
+                    m.effects.shield = 187; floatTexts.push({ x: m.x, y: m.y - 30, text: 'BLOCK!', color: '#88f', age: 0 }) // shield lasts 3s
                 }
             }
 
             function render() {
                 var ctx = ac.getContext('2d');
+                ctx.save();
+                if (screenShake.x || screenShake.y) ctx.translate(screenShake.x, screenShake.y);
                 var bgGrad = ctx.createRadialGradient(W/2, H/2, 50, W/2, H/2, Math.max(W,H)*0.6);
                 bgGrad.addColorStop(0, '#1a1020'); bgGrad.addColorStop(1, '#080810');
                 ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
@@ -650,6 +724,139 @@
                     ctx.restore();
                 }
 
+                // Arena event warning overlay
+                if (arenaEventWarning) {
+                    var aw = arenaEventWarning, awP = aw.age / aw.duration;
+                    var awFlash = Math.sin(aw.age * 0.15) * 0.5 + 0.5;
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255,' + Math.floor(50 + awFlash * 100) + ',0,' + (0.3 + awP * 0.5) + ')';
+                    ctx.lineWidth = 4 + awP * 8;
+                    ctx.strokeRect(bounds[0] + 2, bounds[1] + 2, (bounds[2] - bounds[0]) - 4, (bounds[3] - bounds[1]) - 4);
+                    ctx.globalAlpha = 0.6 + awFlash * 0.4;
+                    ctx.fillStyle = '#ff4400'; ctx.font = 'bold ' + Math.floor(28 + awP * 20) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    var warnLabels = { meteor_shower: '\u2604\ufe0f METEOR SHOWER', shockwave: '\ud83d\udca5 SHOCKWAVE', eclipse: '\ud83c\udf11 ECLIPSE', gravity_surge: '\ud83c\udf00 GRAVITY SURGE', frost_nova: '\u2744\ufe0f FROST NOVA', inferno: '\ud83d\udd25 INFERNO' };
+                    ctx.fillText((warnLabels[aw.type] || aw.type) + ' INCOMING!', W / 2, H * 0.15);
+                    ctx.globalAlpha = 0.8; ctx.fillStyle = '#333'; ctx.fillRect(W * 0.3, H * 0.22, W * 0.4, 8);
+                    ctx.fillStyle = '#f40'; ctx.fillRect(W * 0.3, H * 0.22, W * 0.4 * awP, 8);
+                    ctx.restore();
+                }
+
+                // Arena event active rendering
+                if (arenaEvent) {
+                    var ae = arenaEvent, aeP = ae.age / ae.duration;
+                    var aeFadeIn = Math.min(1, ae.age / 20), aeFadeOut = ae.age > ae.duration - 30 ? Math.max(0, (ae.duration - ae.age) / 30) : 1;
+                    var aeAlpha = aeFadeIn * aeFadeOut;
+
+                    if (ae.type === 'eclipse') {
+                        var eclStr = Math.sin(aeP * Math.PI) * 0.7;
+                        ctx.save(); ctx.fillStyle = 'rgba(0,0,10,' + (eclStr * aeAlpha) + ')'; ctx.fillRect(0, 0, W, H);
+                        ctx.globalAlpha = eclStr * aeAlpha;
+                        for (var si = 0; si < 30; si++) {
+                            var sx2 = ((si * 137.5) % W), sy2 = ((si * 97.3 + si * si * 7) % H);
+                            ctx.fillStyle = 'rgba(255,255,255,' + (0.5 + Math.sin(tickCount * 0.1 + si * 2) * 0.5) + ')';
+                            ctx.fillRect(sx2, sy2, 2, 2);
+                        }
+                        var eclGrd = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.4);
+                        eclGrd.addColorStop(0, 'rgba(80,0,120,' + (eclStr * 0.3) + ')'); eclGrd.addColorStop(1, 'rgba(0,0,0,0)');
+                        ctx.fillStyle = eclGrd; ctx.fillRect(0, 0, W, H);
+                        ctx.fillStyle = '#a040ff'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.globalAlpha = aeAlpha * 0.8;
+                        ctx.fillText('\ud83c\udf11 E C L I P S E', W / 2, 40); ctx.restore();
+                    }
+                    if (ae.type === 'shockwave') {
+                        var swR2 = aeP * Math.max(W, H) * 0.8, swA2 = Math.max(0, 1 - aeP);
+                        ctx.save();
+                        for (var ri = 0; ri < 3; ri++) {
+                            var rr2 = Math.max(0, swR2 - ri * 30);
+                            ctx.globalAlpha = swA2 * (1 - ri * 0.3) * aeAlpha; ctx.strokeStyle = ri === 0 ? '#fff' : ri === 1 ? '#aaf' : '#66f';
+                            ctx.lineWidth = Math.max(1, (10 - ri * 3) * (1 - aeP));
+                            ctx.beginPath(); ctx.arc((bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2, rr2, 0, Math.PI * 2); ctx.stroke();
+                        }
+                        if (ae.age < 15) {
+                            ctx.globalAlpha = Math.max(0, 1 - ae.age / 15) * 0.6;
+                            var swGrd = ctx.createRadialGradient((bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2, 0, (bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2, 150);
+                            swGrd.addColorStop(0, '#fff'); swGrd.addColorStop(1, 'rgba(100,100,255,0)'); ctx.fillStyle = swGrd; ctx.fillRect(0, 0, W, H);
+                        }
+                        ctx.restore();
+                    }
+                    if (ae.type === 'gravity_surge') {
+                        var gCx = (bounds[0] + bounds[2]) / 2, gCy = (bounds[1] + bounds[3]) / 2;
+                        ctx.save(); ctx.globalAlpha = aeAlpha * 0.6;
+                        for (var gi = 0; gi < 12; gi++) {
+                            var ga2 = gi / 12 * Math.PI * 2 + tickCount * 0.03, gr1 = Math.max(W, H) * 0.5, gr2 = 20 + Math.sin(tickCount * 0.05 + gi) * 10;
+                            ctx.strokeStyle = 'rgba(180,0,255,' + (0.3 + Math.sin(tickCount * 0.1 + gi) * 0.2) + ')'; ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            for (var gs = 0; gs <= 20; gs++) { var gp2 = gs / 20, gra = ga2 + gp2 * 2, grr = gr1 * (1 - gp2) + gr2 * gp2; if (gs === 0) ctx.moveTo(gCx + Math.cos(gra) * grr, gCy + Math.sin(gra) * grr); else ctx.lineTo(gCx + Math.cos(gra) * grr, gCy + Math.sin(gra) * grr); }
+                            ctx.stroke();
+                        }
+                        var gvGrd = ctx.createRadialGradient(gCx, gCy, 0, gCx, gCy, 100);
+                        gvGrd.addColorStop(0, 'rgba(150,0,255,0.5)'); gvGrd.addColorStop(0.5, 'rgba(100,0,200,0.2)'); gvGrd.addColorStop(1, 'rgba(50,0,100,0)');
+                        ctx.fillStyle = gvGrd; ctx.beginPath(); ctx.arc(gCx, gCy, 100, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = aeAlpha; ctx.fillStyle = '#c0f'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+                        ctx.fillText('\ud83c\udf00 GRAVITY SURGE', W / 2, 40); ctx.restore();
+                    }
+                    if (ae.type === 'frost_nova') {
+                        ctx.save(); ctx.globalAlpha = aeAlpha * 0.25 * Math.sin(aeP * Math.PI); ctx.fillStyle = 'rgba(100,180,255,1)'; ctx.fillRect(0, 0, W, H);
+                        ctx.globalAlpha = aeAlpha * 0.7;
+                        for (var fi = 0; fi < 20; fi++) {
+                            var fx2 = ((fi * 173.7 + tickCount * 0.3) % (bounds[2] - bounds[0])) + bounds[0], fy2 = ((fi * 211.3 + fi * fi * 13) % (bounds[3] - bounds[1])) + bounds[1];
+                            ctx.strokeStyle = 'rgba(200,230,255,' + (0.4 + Math.sin(tickCount * 0.08 + fi) * 0.3) + ')'; ctx.lineWidth = 1.5;
+                            for (var fj = 0; fj < 6; fj++) { var fa2 = fj / 6 * Math.PI * 2 + fi * 0.5, flen = 8 + Math.sin(tickCount * 0.05 + fi) * 3; ctx.beginPath(); ctx.moveTo(fx2, fy2); ctx.lineTo(fx2 + Math.cos(fa2) * flen, fy2 + Math.sin(fa2) * flen); ctx.stroke(); }
+                        }
+                        ctx.strokeStyle = 'rgba(150,220,255,' + (aeAlpha * 0.6) + ')'; ctx.lineWidth = 6; ctx.setLineDash([8, 4]);
+                        ctx.strokeRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]); ctx.setLineDash([]);
+                        ctx.globalAlpha = aeAlpha; ctx.fillStyle = '#4af'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+                        ctx.fillText('\u2744\ufe0f FROST NOVA', W / 2, 40); ctx.restore();
+                    }
+                    if (ae.type === 'inferno') {
+                        ctx.save(); var infP = Math.sin(aeP * Math.PI);
+                        ctx.globalAlpha = aeAlpha * infP * 0.35;
+                        var infGrd = ctx.createLinearGradient(0, bounds[3], 0, bounds[1]);
+                        infGrd.addColorStop(0, 'rgba(255,100,0,1)'); infGrd.addColorStop(0.4, 'rgba(255,50,0,0.5)'); infGrd.addColorStop(1, 'rgba(200,0,0,0)');
+                        ctx.fillStyle = infGrd; ctx.fillRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+                        ctx.globalAlpha = aeAlpha * 0.8;
+                        for (var ii = 0; ii < 40; ii++) {
+                            var ix2 = ((ii * 127.3) % (bounds[2] - bounds[0])) + bounds[0], iy2 = bounds[3] - ((tickCount * 1.5 + ii * 37) % (bounds[3] - bounds[1]));
+                            var iSize2 = 3 + Math.sin(tickCount * 0.1 + ii) * 2;
+                            ctx.globalAlpha = aeAlpha * Math.max(0, 1 - (bounds[3] - iy2) / (bounds[3] - bounds[1])) * 0.7;
+                            ctx.fillStyle = ['#f80', '#fa0', '#f00', '#ff0'][ii % 4]; ctx.beginPath(); ctx.arc(ix2, iy2, iSize2, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = aeAlpha * 0.15; ctx.strokeStyle = '#f80'; ctx.lineWidth = 1;
+                        for (var hi2 = 0; hi2 < 5; hi2++) {
+                            var hy2 = bounds[1] + (bounds[3] - bounds[1]) * (0.3 + hi2 * 0.15); ctx.beginPath();
+                            for (var hx2 = bounds[0]; hx2 < bounds[2]; hx2 += 5) { var hwy2 = hy2 + Math.sin(hx2 * 0.02 + tickCount * 0.08 + hi2) * 8; if (hx2 === bounds[0]) ctx.moveTo(hx2, hwy2); else ctx.lineTo(hx2, hwy2); } ctx.stroke();
+                        }
+                        ctx.globalAlpha = aeAlpha; ctx.fillStyle = '#f80'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+                        ctx.fillText('\ud83d\udd25 I N F E R N O', W / 2, 40); ctx.restore();
+                    }
+                    if (ae.type === 'meteor_shower') {
+                        ctx.save(); ctx.globalAlpha = aeAlpha * 0.2;
+                        var msGrd = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+                        msGrd.addColorStop(0, 'rgba(255,60,0,1)'); msGrd.addColorStop(1, 'rgba(0,0,0,0)');
+                        ctx.fillStyle = msGrd; ctx.fillRect(0, 0, W, H);
+                        ctx.globalAlpha = aeAlpha; ctx.fillStyle = '#fa0'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+                        ctx.fillText('\u2604\ufe0f METEOR SHOWER', W / 2, 40); ctx.restore();
+                    }
+                }
+                // Render meteors
+                for (var mi2 = 0; mi2 < meteors.length; mi2++) {
+                    var mt2 = meteors[mi2];
+                    if (mt2.hit) {
+                        var crAge = mt2.age - mt2.maxAge, crAlpha = Math.max(0, 1 - crAge / 20);
+                        ctx.save(); ctx.globalAlpha = crAlpha * 0.5;
+                        var crGrd = ctx.createRadialGradient(mt2.tx, mt2.ty, 0, mt2.tx, mt2.ty, 50);
+                        crGrd.addColorStop(0, 'rgba(255,150,0,0.8)'); crGrd.addColorStop(0.5, 'rgba(255,80,0,0.3)'); crGrd.addColorStop(1, 'rgba(0,0,0,0)');
+                        ctx.fillStyle = crGrd; ctx.beginPath(); ctx.arc(mt2.tx, mt2.ty, 50, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                    } else {
+                        var mtP2 = mt2.age / mt2.maxAge;
+                        ctx.save(); ctx.globalAlpha = 0.9;
+                        ctx.strokeStyle = '#fa0'; ctx.lineWidth = 4; ctx.shadowColor = '#f80'; ctx.shadowBlur = 15;
+                        ctx.beginPath(); ctx.moveTo(mt2.x - (mt2.tx - mt2.x) * 0.5, mt2.y - (mt2.ty - mt2.y) * 0.5); ctx.lineTo(mt2.x, mt2.y); ctx.stroke();
+                        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mt2.x, mt2.y, 5 + mtP2 * 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+                        ctx.globalAlpha = 0.2 + mtP2 * 0.3; ctx.strokeStyle = '#f00'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+                        ctx.beginPath(); ctx.arc(mt2.tx, mt2.ty, 40 - mtP2 * 20, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+                    }
+                }
+
                 for (var id in monsters) {
                     var m = monsters[id]; if (!m || !m.path || !m.path.length) continue;
                     var sc = m.size / 40, pcx = 0, pcy = 0;
@@ -678,6 +885,7 @@
                 for (var i = 0; i < particles.length; i++) { var p = particles[i]; ctx.globalAlpha = Math.max(0, 1 - p.age / 30); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill() } ctx.globalAlpha = 1;
                 for (var i = 0; i < blastFx.length; i++) { var b = blastFx[i], a = Math.max(0, 1 - b.age / 20); ctx.strokeStyle = 'rgba(255,255,255,' + a + ')'; ctx.lineWidth = Math.max(1, 4 - b.age * 0.15); ctx.beginPath(); ctx.arc(b.x, b.y, b.age * 4, 0, Math.PI * 2); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,' + (a * 0.5) + ')'; ctx.beginPath(); ctx.arc(b.x, b.y, b.age * 4 * 0.6, 0, Math.PI * 2); ctx.stroke() }
                 for (var i = 0; i < floatTexts.length; i++) { var f = floatTexts[i]; ctx.globalAlpha = Math.max(0, 1 - f.age / 40); ctx.fillStyle = f.color; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(f.text, f.x, f.y - f.age * 0.8); ctx.globalAlpha = 1 }
+                ctx.restore(); // end screen shake transform
 
                 // Update button text
                 var m = monsters[0];
@@ -706,6 +914,7 @@
                 monsters = {}; packs = []; powerups = []; hazards = []; particles = []; blastFx = []; floatTexts = []; activeBlasts = [];
                 bounds = [0, 0, W, H]; tickCount = 0; suddenDeath = false; blastCooldown = 0;
                 lightningWarning = null; lightningStrike = null;
+                arenaEvent = null; arenaEventWarning = null; meteors = []; screenShake = { x: 0, y: 0, intensity: 0, decay: 0.9 };
 
                 var playerName = savedPlayerName || 'You';
                 monsters[0] = initMonster(0, savedPlayerPath.slice(), myColor, playerName, false);
