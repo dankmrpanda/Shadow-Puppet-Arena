@@ -21,7 +21,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Starting HTTP server on port 8080..."
 
     Set-Location $OutDir
-    python -m http.server 8080
+    python -m http.server 8082
 }
 else {
     Write-Host "Extraction failed (tar not found or error)."
