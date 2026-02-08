@@ -82,6 +82,19 @@ Appear later in the match as the battle intensifies:
 - **Sudden Death** triggers when the arena is very small — all unshielded shapes take 2 damage/second
 - **Blast** (Space / button) — pushes all nearby enemies away with a shockwave (3s cooldown)
 
+### Big Arena Events (Simulation Mode)
+
+Every **7 seconds**, a massive arena-wide event triggers with a 2-second warning buildup. Each event has an equal chance of occurring:
+
+| Event | Visual | Effect |
+|-------|--------|--------|
+| ☄️ **Meteor Shower** | Fireballs rain from the sky with streaks, impact craters, red sky tint | Each meteor deals up to 15 damage + knockback in a 70px radius |
+| 💥 **Shockwave** | Triple expanding rings from center + white flash + heavy screen shake | 12 damage to all + massive outward push wave |
+| 🌑 **Eclipse** | Arena goes dark, stars twinkle, eerie purple glow | 3 damage to all every ~0.6s while darkness lasts |
+| 🌀 **Gravity Surge** | 12 spiraling purple vortex lines converge to center + glowing core | Pulls all monsters to center; 5 damage if caught in the core |
+| ❄️ **Frost Nova** | Blue arena tint, animated ice crystals, frozen glowing border | Halves all monster speeds + periodic 2 damage ticks |
+| 🔥 **Inferno** | Orange fire gradient rising from floor, 40 flame particles, heat shimmer waves | 4 damage to all every ~0.4s + random velocity jitter |
+
 ### Controls
 
 | Action | Keyboard | Button |
